@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ApplicationGuideContent } from '@/components/application-guide';
 import { RcsColors } from '@/constants/theme';
 
 const today = new Date();
@@ -53,60 +54,67 @@ export default function HomeScreen() {
               ]}
             >
               <View style={styles.attendanceTopRow}>
-                <Text style={styles.attendanceLabel}>ATTENDANCE</Text>
+                <Text style={styles.attendanceLabel}>ATTENDANCE &amp; DTR</Text>
                 <View style={styles.notConnectedBadge}>
-                  <Text style={styles.notConnectedText}>DEMO</Text>
+                  <Text style={styles.notConnectedText}>PREVIEW</Text>
                 </View>
               </View>
-              <Text style={[styles.attendanceTitle, isDesktop && styles.desktopCardTitle]}>Ready to start your day?</Text>
+              <Text style={[styles.attendanceTitle, isDesktop && styles.desktopCardTitle]}>
+                Your attendance and DTR
+              </Text>
               <Text style={[styles.attendanceDescription, isDesktop && styles.desktopCardDescription]}>
-                Try the clock-in flow in this app preview.
+                Browse your daily record and attendance details.
               </Text>
               <View style={styles.attendanceAction}>
-                <Text style={styles.attendanceActionText}>Open attendance</Text>
+                <Text style={styles.attendanceActionText}>Open attendance &amp; DTR</Text>
                 <Text style={styles.attendanceArrow}>›</Text>
               </View>
             </Pressable>
           </View>
 
           <View style={styles.dashboardColumn}>
-            <View
-              style={[
-                styles.sectionHeadingRow,
-                isDesktop && styles.desktopSectionHeadingRow,
-                isWideScreen && styles.wideSectionHeadingRow,
-              ]}
-            >
-              <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Announcements</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/announcements')}
-                hitSlop={8}
-              >
-                <Text style={styles.seeAll}>See all</Text>
-              </Pressable>
+            <View style={[styles.sectionHeadingRow, isDesktop && styles.desktopSectionHeadingRow]}>
+              <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>
+                Employee milestones
+              </Text>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/announcements')}
-              style={({ pressed }) => [
-                styles.announcementCard,
-                isDesktop && styles.desktopAnnouncementCard,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.announcementIcon}>
-                <Text style={styles.announcementIconText}>i</Text>
+            <View style={[styles.milestonesCard, isDesktop && styles.desktopMilestonesCard]}>
+              <View style={styles.milestoneColumns}>
+                <View style={styles.milestoneColumn}>
+                  <Text style={styles.milestoneTitle}>Birthdays</Text>
+                  <Text style={styles.milestoneDescription}>No live employee updates are connected.</Text>
+                </View>
+                <View style={styles.milestoneDivider} />
+                <View style={styles.milestoneColumn}>
+                  <Text style={styles.milestoneTitle}>Anniversaries</Text>
+                  <Text style={styles.milestoneDescription}>No live employee updates are connected.</Text>
+                </View>
               </View>
-              <View style={styles.announcementCopy}>
-                <Text style={styles.announcementTitle}>Company updates will appear here</Text>
-                <Text style={styles.announcementDescription}>
-                  No live announcement source is connected yet.
-                </Text>
-              </View>
-              <Text style={styles.announcementChevron}>›</Text>
-            </Pressable>
+            </View>
           </View>
+        </View>
+
+        <View style={styles.guideHeadingRow}>
+          <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>
+            Employee application guide
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/help')}
+            hitSlop={8}
+          >
+            <Text style={styles.seeAll}>Open Help</Text>
+          </Pressable>
+        </View>
+        <View style={styles.guideCard}>
+          <ScrollView
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+            style={styles.guideScroll}
+            contentContainerStyle={styles.guideScrollContent}
+          >
+            <ApplicationGuideContent />
+          </ScrollView>
         </View>
 
         <Text
@@ -120,13 +128,6 @@ export default function HomeScreen() {
           Quick access
         </Text>
         <View style={[styles.quickAccess, isDesktop && styles.desktopQuickAccess]}>
-          <QuickAccessButton
-            title="DTR Viewer"
-            subtitle="Browse daily time records"
-            icon="▦"
-            onPress={() => router.push('/dtr')}
-            desktop={isDesktop}
-          />
           <QuickAccessButton
             title="Applications"
             subtitle="Start or track a request"
@@ -238,31 +239,36 @@ const styles = StyleSheet.create({
     marginBottom: 11,
   },
   desktopSectionHeadingRow: { marginTop: 0, marginBottom: 16 },
-  wideSectionHeadingRow: { marginTop: 0 },
   seeAll: { color: RcsColors.brownLight, fontSize: 12, fontWeight: '700' },
-  announcementCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
+  milestonesCard: {
+    padding: 14,
     borderRadius: 14,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
-  desktopAnnouncementCard: { minHeight: 112, padding: 22, borderRadius: 18 },
-  announcementIcon: {
-    width: 36,
-    height: 36,
+  desktopMilestonesCard: { minHeight: 112, padding: 18, borderRadius: 18 },
+  milestoneColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
+  milestoneColumn: { flex: 1, minWidth: 0, gap: 6 },
+  milestoneDivider: { width: 1, backgroundColor: RcsColors.border },
+  milestoneTitle: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
+  milestoneDescription: { color: RcsColors.grayMuted, fontSize: 11, lineHeight: 16 },
+  guideHeadingRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: RcsColors.yellowLight,
+    justifyContent: 'space-between',
+    marginTop: 28,
+    marginBottom: 11,
   },
-  announcementIconText: { color: RcsColors.brown, fontSize: 19, fontWeight: '800' },
-  announcementCopy: { flex: 1, marginLeft: 11, marginRight: 6 },
-  announcementTitle: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
-  announcementDescription: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 11, lineHeight: 16 },
-  announcementChevron: { color: RcsColors.grayMuted, fontSize: 23 },
+  guideCard: {
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  guideScroll: { maxHeight: 320 },
+  guideScrollContent: { paddingBottom: 2 },
   toolsHeading: { marginTop: 28, marginBottom: 11 },
   desktopQuickAccess: { flexWrap: 'wrap', gap: 18 },
   desktopToolsHeading: { marginTop: 38, marginBottom: 16 },

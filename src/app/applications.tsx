@@ -37,12 +37,37 @@ type RequestField = {
 
 type RequestSection = { title: string; fields: RequestField[]; repeatable?: boolean };
 
+const legacyWorkshiftOptions = [
+  '0100A1000A', '0100P0600P', '0100P0700P', '0100P1000P', '0130P0800P', '0200A1100A',
+  '0200P1100P', '0210A1110A', '0300A1200P', '0310A1210P', '0400A0100P', '0400P0100A',
+  '0410A0110P', '0500A0200P', '0510A0210P', '0600A0300P', '0600A0340P', '0600A0410P',
+  '0610A0310P', '0630A0330P', '0630A0410P', '0630A0440P', '0630A1130A', '0630A1200P',
+  '0700A0100P', '0700A0400P', '0700A0440P', '0700A0510P', '0700A1200P', '0710A0410P',
+  '0730A0100P', '0730A0130P', 'REG0730A0430P', '0730A0510P', '0730A0540P', '0730A1230P',
+  '0730A0430P', '0800A0100P', '0800A0500P', '0800A0540P', '0800A0610P', '0800P0500A',
+  '0800P0610A', '0830A0530P', '0830A0610P', '0900A0600P', '0900A0640P', '0900A0710P',
+  'REG0930A0630P', '0930A0710P', '0930A0740P', '1000A0700P', '1000A0740P', '1000A0810P',
+  '1000P0700A', 'REG1030A0730P', '1030A0810P', '1030A0840P', '1030AM730PM',
+  'REG1040A0740P', '1100A0800P', '1100A0840P', '1100A0910P', '1130A0430P', '1130A0830P',
+  '1130A0910P', '1130A0940P', '1200A0900A', '1200P0500P', '1200P0530P', '1200P0600P',
+  '1200P0900P', '1200P0940P', '1200P1010P', '1200P1040P', 'REG1200P0900P', '1210A0910A',
+  '1230P0530P', '1230P0630P', '1230P1010P', '1230P1040P', '0100P1110P', '0200P1140P',
+  '0130P1140P', '0100P1040P', 'REG630AM330PM', 'REG7AM4PM', 'REG800AM500PM', 'REG830AM530P',
+];
+
 const requestForms: Record<string, RequestSection[]> = {
   Attendance: [
     {
       title: 'Attendance details',
       fields: [
-        { key: 'shift', label: 'Shift', type: 'combo', placeholder: 'Search or enter your shift code', required: true },
+        {
+          key: 'shift',
+          label: 'Shift',
+          type: 'combo',
+          options: legacyWorkshiftOptions,
+          placeholder: 'Search available shift times',
+          required: true,
+        },
         { key: 'lateFiling', label: 'Late Filing', type: 'checkbox' },
         { key: 'dateIn', label: 'Date In', type: 'date', required: true },
         { key: 'timeIn', label: 'Time In', type: 'time', required: true },
@@ -314,7 +339,14 @@ const requestForms: Record<string, RequestSection[]> = {
       fields: [
         { key: 'dateFrom', label: 'Date From', type: 'date', required: true },
         { key: 'dateTo', label: 'Date To', type: 'date', required: true },
-        { key: 'workshift', label: 'WorkShift', type: 'combo', placeholder: 'Search or enter your workshift code', required: true },
+        {
+          key: 'workshift',
+          label: 'WorkShift',
+          type: 'combo',
+          options: legacyWorkshiftOptions,
+          placeholder: 'Search available workshifts',
+          required: true,
+        },
         { key: 'reason', label: 'Reason', type: 'textarea', required: true },
       ],
     },

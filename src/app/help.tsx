@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
+import { ApplicationGuideContent, applicationGuide } from '@/components/application-guide';
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { RcsColors } from '@/constants/theme';
 
@@ -17,7 +18,16 @@ export default function HelpScreen() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState('');
   const matches = useMemo(
-    () => resources.filter((item) => `${item.title} ${item.type}`.toLowerCase().includes(query.trim().toLowerCase())),
+    () =>
+      resources.filter((item) =>
+        `${item.title} ${item.type} ${
+          item.title === 'Employee Online Application Guide'
+            ? applicationGuide.map((section) => `${section.title} ${section.steps.join(' ')}`).join(' ')
+            : ''
+        }`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase())
+      ),
     [query]
   );
 
@@ -25,8 +35,8 @@ export default function HelpScreen() {
     <PortalPage>
       <PageHeading title="Help" description="Search employee FAQs, guides, and system instructions." />
       <PreviewNotice>
-        The portal shows searchable FAQ and manual resources. Their full content is not copied into
-        this preview; connect an approved help content source to show the official guidance.
+        The application instructions below are adapted from the legacy Employee Online Application
+        Guide. Other FAQs and the User Manual still need their source content.
       </PreviewNotice>
 
       <TextInput
@@ -57,9 +67,15 @@ export default function HelpScreen() {
             </View>
             <Text style={styles.resourceArrow}>{selected === resource.title ? '⌃' : '›'}</Text>
             {selected === resource.title ? (
-              <Text style={styles.resourceUnavailable}>
-                Official article content will be available when the help library is connected.
-              </Text>
+              resource.title === 'Employee Online Application Guide' ? (
+                <View style={styles.guideContent}>
+                  <ApplicationGuideContent />
+                </View>
+              ) : (
+                <Text style={styles.resourceUnavailable}>
+                  Official article content will be available when the help library is connected.
+                </Text>
+              )
             ) : null}
           </Pressable>
         ))}
@@ -108,5 +124,6 @@ const styles = StyleSheet.create({
   resourceTitle: { marginTop: 4, color: RcsColors.brownDark, fontSize: 15, fontWeight: '700' },
   resourceArrow: { marginLeft: 12, color: RcsColors.brownLight, fontSize: 22 },
   resourceUnavailable: { width: '100%', marginTop: 12, color: RcsColors.grayMuted, fontSize: 12, lineHeight: 18 },
+  guideContent: { width: '100%', marginTop: 14 },
   pressed: { opacity: 0.75 },
 });

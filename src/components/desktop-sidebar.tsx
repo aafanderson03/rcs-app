@@ -10,7 +10,6 @@ type Route =
   | '/announcements'
   | '/attendance'
   | '/applications'
-  | '/dtr'
   | '/help'
   | '/other-urls'
   | '/portal'
@@ -179,9 +178,8 @@ export function DesktopSidebar({
         <Text style={styles.sectionLabel}>WORKSPACE</Text>
         {renderLink({ label: 'Announcement', route: '/announcements' }, true)}
         {renderLink({ label: 'Dashboard', route: '/dashboard' }, true)}
-        {renderLink({ label: 'Attendance', route: '/attendance' }, true)}
+        {renderLink({ label: 'Attendance & DTR', route: '/attendance' }, true)}
         {renderLink({ label: 'Applications', route: '/applications' }, true)}
-        {renderLink({ label: 'DTR Viewer', route: '/dtr' }, true)}
 
         <Text style={[styles.sectionLabel, styles.recordsLabel]}>EMPLOYEE RECORDS</Text>
         {menuGroups.map((group) => {

@@ -11,6 +11,7 @@
       "icon": "./assets/images/rcs-app-icon.png"
     },
     "android": {
+      "package": "com.eigosan.rcsemployee",
       "backgroundColor": "#F8F6F1",
       "adaptiveIcon": {
         "backgroundColor": "#E7B83F",
@@ -38,6 +39,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2a03a107-7a10-485c-a495-8c11cf8abb8d"
+      }
     }
   }
 }

@@ -7,20 +7,39 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+export const RcsColors = {
+  yellow: '#E7B83F',
+  yellowLight: '#FFF4D3',
+  yellowDeep: '#C89519',
+  brown: '#694522',
+  brownDark: '#432E1D',
+  brownLight: '#8A6338',
+  gray: '#68645F',
+  grayDark: '#393632',
+  grayMuted: '#827C73',
+  grayLight: '#F1EFEB',
+  background: '#F8F6F1',
+  surface: '#FFFFFF',
+  border: '#E7E1D6',
+  text: '#332B24',
+  mutedText: '#746D64',
+  white: '#FFFFFF',
+} as const;
+
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: RcsColors.text,
+    background: RcsColors.background,
+    backgroundElement: RcsColors.grayLight,
+    backgroundSelected: RcsColors.yellowLight,
+    textSecondary: RcsColors.mutedText,
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: RcsColors.white,
+    background: RcsColors.brownDark,
+    backgroundElement: RcsColors.grayDark,
+    backgroundSelected: RcsColors.brown,
+    textSecondary: '#D2C8B9',
   },
 } as const;
 

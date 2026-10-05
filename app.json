@@ -1,36 +1,37 @@
 {
   "expo": {
-    "name": "rcs-app",
+    "name": "RCS Employee",
     "slug": "rcs-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/rcs-app-icon.png",
     "scheme": "rcsapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/rcs-app-icon.png"
     },
     "android": {
+      "backgroundColor": "#F8F6F1",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#E7B83F",
+        "foregroundImage": "./assets/images/rcs-android-foreground.png",
+        "monochromeImage": "./assets/images/rcs-android-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/rcs-app-icon.png"
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-prototype-http-portal",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#F8F6F1",
+          "image": "./assets/images/rcs-supermarket-logo.png",
+          "imageWidth": 170
         }
       ]
     ],

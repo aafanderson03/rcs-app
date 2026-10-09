@@ -222,7 +222,7 @@ export function DesktopSidebar({
         <View style={styles.phaseBadge}>
           <Text style={styles.phaseBadgeText}>PHASE 1</Text>
         </View>
-        <Text style={styles.version}>Prototype · {formattedToday}</Text>
+        <Text style={styles.version}>Prototype · 10.09.2026</Text> 
       </View>
     </View>
   );

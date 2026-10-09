@@ -1,20 +1,24 @@
 import { Link } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 export default function AnnouncementsScreen() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [tickerOffset] = useState(() => new Animated.Value(0));
@@ -65,7 +69,7 @@ export default function AnnouncementsScreen() {
                     ? (event) => setTickerCopyWidth(event.nativeEvent.layout.width)
                     : undefined
                 }
-                style={styles.tickerText}
+                style={[styles.tickerText, colorScheme === 'dark' && styles.darkTickerText]}
               >
                 {tickerMessage}
               </Text>
@@ -90,7 +94,8 @@ export default function AnnouncementsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
   content: { width: '100%', maxWidth: 620, alignSelf: 'center', padding: 24, paddingBottom: 36 },
   desktopContent: { maxWidth: 1180, padding: 32, paddingBottom: 40 },
@@ -105,7 +110,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: RcsColors.brown,
+    backgroundColor: RcsColors.brownSurface,
   },
   tickerTrack: { alignSelf: 'flex-start', flexDirection: 'row' },
   tickerText: {
@@ -114,6 +119,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  darkTickerText: { color: RcsColors.text },
   announcementList: {
     padding: 17,
     borderRadius: 14,
@@ -140,4 +146,5 @@ const styles = StyleSheet.create({
   listCopy: { flex: 1 },
   emptyTitle: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
   emptyDescription: { marginTop: 4, color: RcsColors.gray, fontSize: 12, lineHeight: 18 },
-});
+  });
+}

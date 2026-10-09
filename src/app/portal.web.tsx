@@ -1,11 +1,16 @@
-import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const PORTAL_URL = 'http://161.49.223.6/RCS_ONLINE';
 
 export default function PortalScreen() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [openError, setOpenError] = useState<string | null>(null);
 
   const openPortal = async () => {
@@ -39,7 +44,8 @@ export default function PortalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -63,8 +69,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: RcsColors.brown,
+    backgroundColor: RcsColors.brownSurface,
   },
   buttonText: { color: RcsColors.white, fontSize: 14, fontWeight: '700' },
   error: { color: RcsColors.brownDark, fontSize: 13, marginTop: 12 },
-});
+  });
+}

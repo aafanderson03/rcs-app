@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ApplicationGuideContent, applicationGuide } from '@/components/application-guide';
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const resources = [
   { title: 'PAG-IBIG FAQ', type: 'Frequently asked questions' },
@@ -13,6 +15,9 @@ const resources = [
 ];
 
 export default function HelpScreen() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [query, setQuery] = useState('');
@@ -42,7 +47,7 @@ export default function HelpScreen() {
       <TextInput
         accessibilityLabel="Search help"
         placeholder="Search titles and topics"
-        placeholderTextColor={RcsColors.grayMuted}
+        placeholderTextColor={palette.grayMuted}
         value={query}
         onChangeText={setQuery}
         style={styles.search}
@@ -90,7 +95,8 @@ export default function HelpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   search: {
     minHeight: 48,
     paddingHorizontal: 15,
@@ -126,4 +132,5 @@ const styles = StyleSheet.create({
   resourceUnavailable: { width: '100%', marginTop: 12, color: RcsColors.grayMuted, fontSize: 12, lineHeight: 18 },
   guideContent: { width: '100%', marginTop: 14 },
   pressed: { opacity: 0.75 },
-});
+  });
+}

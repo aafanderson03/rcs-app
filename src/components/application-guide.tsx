@@ -1,6 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { RcsColors } from '@/constants/theme';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { useAppTheme } from '@/contexts/theme-context';
 
 export const applicationGuide = [
   {
@@ -79,6 +82,9 @@ export const applicationGuide = [
 ];
 
 export function ApplicationGuideContent() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   return (
     <View style={styles.content}>
       <Text style={styles.notice}>
@@ -101,7 +107,8 @@ export function ApplicationGuideContent() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   content: { gap: 14 },
   notice: {
     padding: 12,
@@ -116,4 +123,5 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
   stepNumber: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   stepText: { flex: 1, color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
-});
+  });
+}

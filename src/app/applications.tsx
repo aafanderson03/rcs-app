@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
 import {
   ChoicePicker,
   EmptyState,
@@ -10,7 +11,8 @@ import {
   PortalPage,
   PreviewNotice,
 } from '@/components/portal-ui';
-import { RcsColors } from '@/constants/theme';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const transactionTypes = [
   'Attendance',
@@ -354,6 +356,7 @@ const requestForms: Record<string, RequestSection[]> = {
 };
 
 export default function ApplicationsScreen() {
+  const { colorScheme, styles } = useApplicationStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [selectedTransaction, setSelectedTransaction] = useState('');
@@ -389,7 +392,10 @@ export default function ApplicationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: getPaletteForScheme(colorScheme).background }]}
+      edges={['bottom']}
+    >
       <ScrollView
         contentContainerStyle={[styles.content, isDesktop && styles.desktopContent]}
         showsVerticalScrollIndicator={false}
@@ -551,6 +557,7 @@ function RequestForm({
   transaction: string;
   onBack: () => void;
 }) {
+  const { palette, styles } = useApplicationStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [values, setValues] = useState<Record<string, string>>({});
@@ -683,7 +690,7 @@ function RequestForm({
                       value={value}
                       onChangeText={(text) => updateValue(field.key, text)}
                       placeholder={field.placeholder ?? placeholderFor(field)}
-                      placeholderTextColor={RcsColors.grayMuted}
+                      placeholderTextColor={palette.grayMuted}
                       keyboardType={
                         field.type === 'number'
                           ? 'decimal-pad'
@@ -775,6 +782,7 @@ function RequestDatePicker({
   onChange: (date: string) => void;
   onOpenChange: (isOpen: boolean) => void;
 }) {
+  const { styles } = useApplicationStyles();
   const selectedDate = parseRequestDate(value);
   const [month, setMonth] = useState(() => selectedDate ?? new Date());
 
@@ -844,6 +852,7 @@ function RequestComboPicker({
   onChange: (value: string) => void;
   onOpenChange: (isOpen: boolean) => void;
 }) {
+  const { palette, styles } = useApplicationStyles();
   const matchingOptions = options.filter((option) =>
     option.toLowerCase().includes(value.trim().toLowerCase())
   );
@@ -867,7 +876,7 @@ function RequestComboPicker({
           }}
           onFocus={() => setPickerOpen(true)}
           placeholder={placeholder}
-          placeholderTextColor={RcsColors.grayMuted}
+          placeholderTextColor={palette.grayMuted}
           style={styles.comboInput}
         />
         <Pressable
@@ -947,6 +956,7 @@ function OptionPicker({
   open: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }) {
+  const { styles } = useApplicationStyles();
   return (
     <View style={[styles.picker, open && styles.openPicker]}>
       <Text style={styles.pickerLabel}>{label}</Text>
@@ -997,7 +1007,15 @@ function OptionPicker({
   );
 }
 
-const styles = StyleSheet.create({
+function useApplicationStyles() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  return { colorScheme, palette, styles };
+}
+
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 24, paddingBottom: 40 },
   desktopContent: { maxWidth: 1500, padding: 32, paddingBottom: 44 },
@@ -1046,7 +1064,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 15,
     borderRadius: 11,
-    backgroundColor: RcsColors.white,
+    backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
@@ -1064,7 +1082,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     paddingVertical: 4,
     borderRadius: 11,
-    backgroundColor: RcsColors.white,
+    backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
@@ -1088,7 +1106,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 18,
     borderRadius: 11,
-    backgroundColor: RcsColors.brown,
+    backgroundColor: RcsColors.brownSurface,
   },
   desktopContinueButton: { width: '100%', marginTop: 12 },
   continueButtonDisabled: { opacity: 0.55 },
@@ -1102,7 +1120,7 @@ const styles = StyleSheet.create({
   listSubtitle: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 12 },
   viewToggle: { flexDirection: 'row', gap: 4 },
   viewToggleOption: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 8, backgroundColor: RcsColors.grayLight },
-  selectedView: { backgroundColor: RcsColors.brown },
+  selectedView: { backgroundColor: RcsColors.brownSurface },
   viewToggleText: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
   selectedViewText: { color: RcsColors.white },
   filters: { gap: 12, marginBottom: 18, zIndex: 10, elevation: 10 },
@@ -1184,21 +1202,21 @@ const styles = StyleSheet.create({
   comboNoResults: { padding: 12, color: RcsColors.grayMuted, fontSize: 12 },
   fullWidthFormField: { flexBasis: '100%' },
   formLabel: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
-  requiredMark: { color: '#B42318' },
+  requiredMark: { color: RcsColors.danger },
   formInput: {
     minHeight: 46,
     paddingHorizontal: 13,
     paddingVertical: 11,
     borderRadius: 10,
-    backgroundColor: RcsColors.white,
+    backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
     color: RcsColors.text,
     fontSize: 13,
   },
   textAreaInput: { minHeight: 96, textAlignVertical: 'top' },
-  formFieldError: { borderColor: '#B42318' },
-  fieldError: { color: '#B42318', fontSize: 11 },
+  formFieldError: { borderColor: RcsColors.danger },
+  fieldError: { color: RcsColors.danger, fontSize: 11 },
   checkField: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: {
     width: 20,
@@ -1208,9 +1226,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: RcsColors.border,
     borderRadius: 5,
-    backgroundColor: RcsColors.white,
+    backgroundColor: RcsColors.surface,
   },
-  checkboxChecked: { backgroundColor: RcsColors.brown, borderColor: RcsColors.brown },
+  checkboxChecked: { backgroundColor: RcsColors.brownSurface, borderColor: RcsColors.brownSurface },
   checkboxMark: { color: RcsColors.white, fontSize: 13, fontWeight: '800' },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 4 },
   secondaryFormButton: {
@@ -1230,10 +1248,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 20,
     borderRadius: 10,
-    backgroundColor: RcsColors.brown,
+    backgroundColor: RcsColors.brownSurface,
   },
   primaryFormButtonText: { color: RcsColors.white, fontSize: 13, fontWeight: '700' },
-  formValidationMessage: { marginTop: 12, color: '#B42318', fontSize: 12, lineHeight: 18 },
+  formValidationMessage: { marginTop: 12, color: RcsColors.danger, fontSize: 12, lineHeight: 18 },
   reviewCard: {
     padding: 20,
     marginTop: 18,
@@ -1247,4 +1265,5 @@ const styles = StyleSheet.create({
   reviewRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: RcsColors.border },
   reviewLabel: { flex: 1, color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
   reviewValue: { flex: 1, color: RcsColors.text, fontSize: 12, textAlign: 'right' },
-});
+  });
+}

@@ -1,14 +1,19 @@
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
-import { RcsColors } from '@/constants/theme';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const PORTAL_URL = 'http://161.49.223.6/RCS_ONLINE';
 const PORTAL_ORIGIN = 'http://161.49.223.6';
 
 export default function PortalScreen() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -62,7 +67,7 @@ export default function PortalScreen() {
           startInLoadingState
           renderLoading={() => (
             <View style={styles.loading}>
-              <ActivityIndicator size="large" color={RcsColors.brown} />
+              <ActivityIndicator size="large" color={palette.brown} />
               <Text style={styles.loadingText}>Connecting to the employee system…</Text>
             </View>
           )}
@@ -92,7 +97,8 @@ export default function PortalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: RcsColors.background },
   header: {
     minHeight: 56,
@@ -140,7 +146,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 11,
     borderRadius: 8,
-    backgroundColor: RcsColors.brown,
+    backgroundColor: RcsColors.brownSurface,
   },
   retryText: { color: RcsColors.white, fontSize: 14, fontWeight: '700' },
-});
+  });
+}

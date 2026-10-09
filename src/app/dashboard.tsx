@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ChoicePicker, EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const statusOptions = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
 const transactionCategories = [
@@ -18,6 +20,7 @@ const transactionCategories = [
 ];
 
 export default function DashboardScreen() {
+  const { styles } = useDashboardStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [status, setStatus] = useState(statusOptions[0]);
@@ -89,6 +92,7 @@ function DateField({
   value: string;
   onChangeText: (value: string) => void;
 }) {
+  const { styles, palette } = useDashboardStyles();
   return (
     <View style={styles.dateField}>
       <Text style={styles.filterLabel}>{label}</Text>
@@ -97,14 +101,22 @@ function DateField({
         value={value}
         onChangeText={onChangeText}
         placeholder="YYYY-MM-DD"
-        placeholderTextColor={RcsColors.grayMuted}
+        placeholderTextColor={palette.grayMuted}
         style={styles.dateInput}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+function useDashboardStyles() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  return { styles, palette };
+}
+
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   filters: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -134,7 +146,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     padding: 24,
     borderRadius: 16,
-    backgroundColor: RcsColors.brown,
+    backgroundColor: RcsColors.brownSurface,
   },
   summaryEyebrow: { color: RcsColors.yellow, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   summaryTitle: { marginTop: 10, color: RcsColors.white, fontSize: 18, fontWeight: '700' },
@@ -156,4 +168,5 @@ const styles = StyleSheet.create({
   categoryDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: RcsColors.yellowDeep },
   categoryName: { flex: 1, marginLeft: 10, color: RcsColors.grayDark, fontSize: 13 },
   categoryValue: { color: RcsColors.grayMuted, fontSize: 14, fontWeight: '700' },
-});
+  });
+}

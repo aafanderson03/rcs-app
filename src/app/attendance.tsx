@@ -1,10 +1,15 @@
-import { useState } from 'react';
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { EmptyState, PageHeading, PortalCalendar, PortalPage, PreviewNotice } from '@/components/portal-ui';
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 export default function AttendanceScreen() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [visibleMonth, setVisibleMonth] = useState(() => {
@@ -66,7 +71,8 @@ export default function AttendanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   contentColumns: { gap: 18 },
   desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 22 },
   calendarColumn: { flex: 1.2, minWidth: 0 },
@@ -78,4 +84,5 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-});
+  });
+}

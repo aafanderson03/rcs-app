@@ -1,9 +1,11 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ChoicePicker, EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const inquirySections = {
   'basic-profile': {
@@ -120,6 +122,7 @@ const payslipFields = [
 ];
 
 export default function InquiryScreen() {
+  const styles = useInquiryStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const { section: rawSection } = useLocalSearchParams<{ section: string }>();
@@ -215,6 +218,7 @@ export default function InquiryScreen() {
 }
 
 function DataTable({ columns }: { columns: string[] }) {
+  const styles = useInquiryStyles();
   return (
     <View style={styles.tableCard}>
       <View style={styles.tableHeader}>
@@ -232,7 +236,14 @@ function DataTable({ columns }: { columns: string[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+function useInquiryStyles() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  return useMemo(() => createStyles(palette), [palette]);
+}
+
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   filter: { maxWidth: 380, marginBottom: 18, zIndex: 10, elevation: 10 },
   payPeriod: {
     maxWidth: 480,
@@ -289,4 +300,5 @@ const styles = StyleSheet.create({
     borderBottomColor: RcsColors.border,
   },
   tableHeading: { flex: 1, minWidth: 100, color: RcsColors.grayDark, fontSize: 11, fontWeight: '800' },
-});
+  });
+}

@@ -1,19 +1,16 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
-export const RcsColors = {
+const lightPalette = {
   yellow: '#E7B83F',
   yellowLight: '#FFF4D3',
-  yellowDeep: '#C89519',
+  yellowDeep: '#8A5A00',
   brown: '#694522',
   brownDark: '#432E1D',
   brownLight: '#8A6338',
+  brownSurface: '#694522',
+  danger: '#B42318',
   gray: '#68645F',
   grayDark: '#393632',
   grayMuted: '#827C73',
@@ -26,20 +23,48 @@ export const RcsColors = {
   white: '#FFFFFF',
 } as const;
 
+const darkPalette: Record<keyof typeof lightPalette, string> = {
+  yellow: '#F2C75C',
+  yellowLight: '#4B3A1E',
+  yellowDeep: '#F2C75C',
+  brown: '#D6A85D',
+  brownDark: '#F4EFE7',
+  brownLight: '#E4C58D',
+  brownSurface: '#5D442C',
+  danger: '#FF9A90',
+  gray: '#C2BBB0',
+  grayDark: '#DED8CE',
+  grayMuted: '#B2A99B',
+  grayLight: '#302D29',
+  background: '#171615',
+  surface: '#24211D',
+  border: '#484239',
+  text: '#F4EFE7',
+  mutedText: '#C3BBAF',
+  white: '#FFFFFF',
+};
+
+export type RcsPalette = typeof lightPalette;
+export type ColorScheme = 'light' | 'dark';
+
+export function getPaletteForScheme(scheme: ColorScheme): Record<keyof RcsPalette, string> {
+  return scheme === 'dark' ? darkPalette : lightPalette;
+}
+
 export const Colors = {
   light: {
-    text: RcsColors.text,
-    background: RcsColors.background,
-    backgroundElement: RcsColors.grayLight,
-    backgroundSelected: RcsColors.yellowLight,
-    textSecondary: RcsColors.mutedText,
+    text: lightPalette.text,
+    background: lightPalette.background,
+    backgroundElement: lightPalette.grayLight,
+    backgroundSelected: lightPalette.yellowLight,
+    textSecondary: lightPalette.mutedText,
   },
   dark: {
-    text: RcsColors.white,
-    background: RcsColors.brownDark,
-    backgroundElement: RcsColors.grayDark,
-    backgroundSelected: RcsColors.brown,
-    textSecondary: '#D2C8B9',
+    text: darkPalette.text,
+    background: darkPalette.background,
+    backgroundElement: darkPalette.grayLight,
+    backgroundSelected: darkPalette.yellowLight,
+    textSecondary: darkPalette.mutedText,
   },
 } as const;
 
@@ -47,13 +72,9 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {

@@ -1,12 +1,17 @@
-import { useState } from 'react';
-import { StyleSheet, TextInput } from 'react-native';
+import { useMemo, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveTextInput as TextInput } from '@/components/responsive-text';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const companyLinks: { description: string; url: string }[] = [];
 
 export default function OtherUrlsScreen() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [query, setQuery] = useState('');
   const matchingLinks = companyLinks.filter((item) =>
     `${item.description} ${item.url}`.toLowerCase().includes(query.trim().toLowerCase())
@@ -25,7 +30,7 @@ export default function OtherUrlsScreen() {
       <TextInput
         accessibilityLabel="Search company URLs"
         placeholder="Search company links"
-        placeholderTextColor={RcsColors.grayMuted}
+        placeholderTextColor={palette.grayMuted}
         value={query}
         onChangeText={setQuery}
         style={styles.search}
@@ -44,7 +49,8 @@ export default function OtherUrlsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   search: {
     minHeight: 48,
     paddingHorizontal: 15,
@@ -56,4 +62,5 @@ const styles = StyleSheet.create({
     color: RcsColors.text,
     fontSize: 13,
   },
-});
+  });
+}

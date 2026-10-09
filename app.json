@@ -30,7 +30,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F8F6F1",
+          "backgroundColor": "#05040D",
           "image": "./assets/images/rcs-supermarket-logo.png",
           "imageWidth": 170
         }

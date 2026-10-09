@@ -1,9 +1,12 @@
 import { useRouter } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useMemo } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApplicationGuideContent } from '@/components/application-guide';
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getPaletteForScheme } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 const today = new Date();
 const greeting =
@@ -15,6 +18,9 @@ const formattedDate = today.toLocaleDateString(undefined, {
 });
 
 export default function HomeScreen() {
+  const { colorScheme } = useAppTheme();
+  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
@@ -170,6 +176,10 @@ function QuickAccessButton({
   onPress: () => void;
   desktop: boolean;
 }) {
+  const { colorScheme } = useAppTheme();
+  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -191,18 +201,18 @@ function QuickAccessButton({
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: RcsColors.background },
+const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
   content: { width: '100%', padding: 24, paddingBottom: 36 },
   desktopContent: { alignSelf: 'flex-start', padding: 44, paddingBottom: 56 },
   wideScreenContent: { paddingHorizontal: 56 },
   greeting: { marginTop: 30, marginBottom: 23 },
   desktopGreeting: { marginTop: 18, marginBottom: 34 },
-  greetingText: { color: RcsColors.brownDark, fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
+  greetingText: { color: colors.brownDark, fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
   desktopGreetingText: { fontSize: 34, letterSpacing: -0.5 },
-  dateText: { marginTop: 5, color: RcsColors.grayMuted, fontSize: 13 },
+  dateText: { marginTop: 5, color: colors.grayMuted, fontSize: 13 },
   desktopDateText: { fontSize: 15 },
-  sectionTitle: { color: RcsColors.brown, fontSize: 17, fontWeight: '700' },
+  sectionTitle: { color: colors.brown, fontSize: 17, fontWeight: '700' },
   desktopSectionTitle: { fontSize: 20 },
   dashboardGrid: { gap: 28 },
   desktopDashboardGrid: { gap: 36 },
@@ -215,22 +225,22 @@ const styles = StyleSheet.create({
     padding: 18,
     marginTop: 12,
     borderRadius: 17,
-    backgroundColor: RcsColors.brown,
+    backgroundColor: colors.brownSurface,
   },
   attendanceTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  attendanceLabel: { color: RcsColors.yellowLight, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  attendanceLabel: { color: colors.yellow, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   notConnectedBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
-  notConnectedText: { color: RcsColors.yellowLight, fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
-  attendanceTitle: { marginTop: 16, color: RcsColors.white, fontSize: 20, fontWeight: '700' },
+  notConnectedText: { color: colors.yellow, fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
+  attendanceTitle: { marginTop: 16, color: colors.white, fontSize: 20, fontWeight: '700' },
   attendanceDescription: { marginTop: 5, color: '#E4D9C9', fontSize: 13, lineHeight: 19 },
   attendanceAction: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
-  attendanceActionText: { color: RcsColors.yellow, fontSize: 13, fontWeight: '700' },
-  attendanceArrow: { marginLeft: 5, color: RcsColors.yellow, fontSize: 22, lineHeight: 24 },
+  attendanceActionText: { color: colors.yellow, fontSize: 13, fontWeight: '700' },
+  attendanceArrow: { marginLeft: 5, color: colors.yellow, fontSize: 22, lineHeight: 24 },
   sectionHeadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -239,20 +249,20 @@ const styles = StyleSheet.create({
     marginBottom: 11,
   },
   desktopSectionHeadingRow: { marginTop: 0, marginBottom: 16 },
-  seeAll: { color: RcsColors.brownLight, fontSize: 12, fontWeight: '700' },
+  seeAll: { color: colors.brownLight, fontSize: 12, fontWeight: '700' },
   milestonesCard: {
     padding: 14,
     borderRadius: 14,
-    backgroundColor: RcsColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: RcsColors.border,
+    borderColor: colors.border,
   },
   desktopMilestonesCard: { minHeight: 112, padding: 18, borderRadius: 18 },
   milestoneColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 12 },
   milestoneColumn: { flex: 1, minWidth: 0, gap: 6 },
-  milestoneDivider: { width: 1, backgroundColor: RcsColors.border },
-  milestoneTitle: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
-  milestoneDescription: { color: RcsColors.grayMuted, fontSize: 11, lineHeight: 16 },
+  milestoneDivider: { width: 1, backgroundColor: colors.border },
+  milestoneTitle: { color: colors.brownDark, fontSize: 13, fontWeight: '700' },
+  milestoneDescription: { color: colors.grayMuted, fontSize: 11, lineHeight: 16 },
   guideHeadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -263,9 +273,9 @@ const styles = StyleSheet.create({
   guideCard: {
     padding: 14,
     borderRadius: 14,
-    backgroundColor: RcsColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: RcsColors.border,
+    borderColor: colors.border,
   },
   guideScroll: { maxHeight: 320 },
   guideScrollContent: { paddingBottom: 2 },
@@ -278,9 +288,9 @@ const styles = StyleSheet.create({
     minHeight: 116,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: RcsColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: RcsColors.border,
+    borderColor: colors.border,
   },
   desktopQuickAccessButton: {
     flexGrow: 0,
@@ -296,13 +306,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-    backgroundColor: RcsColors.yellowLight,
+    backgroundColor: colors.yellowLight,
   },
-  quickAccessIconText: { color: RcsColors.brown, fontSize: 17, fontWeight: '700' },
-  quickAccessTitle: { marginTop: 11, color: RcsColors.brownDark, fontSize: 12, fontWeight: '700' },
+  quickAccessIconText: { color: colors.brown, fontSize: 17, fontWeight: '700' },
+  quickAccessTitle: { marginTop: 11, color: colors.brownDark, fontSize: 12, fontWeight: '700' },
   desktopQuickAccessTitle: { marginTop: 16, fontSize: 16 },
-  quickAccessSubtitle: { marginTop: 3, color: RcsColors.grayMuted, fontSize: 10 },
+  quickAccessSubtitle: { marginTop: 3, color: colors.grayMuted, fontSize: 10 },
   desktopQuickAccessSubtitle: { fontSize: 13 },
   pressed: { opacity: 0.8 },
-  footer: { marginTop: 23, color: RcsColors.grayMuted, fontSize: 10, lineHeight: 15, textAlign: 'center' },
+  footer: { marginTop: 23, color: colors.grayMuted, fontSize: 10, lineHeight: 15, textAlign: 'center' },
 });

@@ -1,8 +1,10 @@
 import { usePathname, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { RcsColors } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getPaletteForScheme } from '@/constants/theme';
+import { useAppTheme } from '@/contexts/theme-context';
 
 type Route =
   | '/'
@@ -104,9 +106,11 @@ export function DesktopSidebar({
   fullScreen = false,
   onClose,
 }: DesktopSidebarProps) {
+  const { colorScheme } = useAppTheme();
   const pathname = usePathname();
   const router = useRouter();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(initialExpandedGroups);
+  const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
 
   const navigate = (route: Route) => {
     router.replace(route);
@@ -224,13 +228,14 @@ export function DesktopSidebar({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
+  return StyleSheet.create({
   sidebar: {
     width: 288,
     height: '100%',
-    backgroundColor: RcsColors.surface,
+    backgroundColor: colors.surface,
     borderRightWidth: 1,
-    borderRightColor: RcsColors.border,
+    borderRightColor: colors.border,
   },
   fullScreenSidebar: { width: '100%', maxWidth: '100%', borderRightWidth: 0 },
   sidebarHeader: {
@@ -239,34 +244,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    backgroundColor: RcsColors.background,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: RcsColors.border,
+    borderBottomColor: colors.border,
   },
   sidebarEyebrow: {
-    color: RcsColors.brownLight,
+    color: colors.brownLight,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
-  sidebarTitle: { marginTop: 5, color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
+  sidebarTitle: { marginTop: 5, color: colors.brownDark, fontSize: 18, fontWeight: '800' },
   closeButton: {
     width: 42,
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: RcsColors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: RcsColors.border,
+    borderColor: colors.border,
   },
-  closeButtonText: { color: RcsColors.brown, fontSize: 28, lineHeight: 30 },
+  closeButtonText: { color: colors.brown, fontSize: 28, lineHeight: 30 },
   menuScroll: { flex: 1 },
   menuContent: { paddingHorizontal: 14, paddingTop: 22, paddingBottom: 20 },
   sectionLabel: {
     marginHorizontal: 12,
     marginBottom: 8,
-    color: RcsColors.grayMuted,
+    color: colors.grayMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
@@ -281,7 +286,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     borderRadius: 10,
   },
-  primaryLinkText: { color: RcsColors.grayDark, fontSize: 13, fontWeight: '600' },
+  primaryLinkText: { color: colors.grayDark, fontSize: 13, fontWeight: '600' },
   group: { marginBottom: 4 },
   groupToggle: {
     minHeight: 46,
@@ -293,18 +298,18 @@ const styles = StyleSheet.create({
   },
   groupLabel: {
     flex: 1,
-    color: RcsColors.grayDark,
+    color: colors.grayDark,
     fontSize: 13,
     lineHeight: 17,
     fontWeight: '700',
   },
-  groupChevron: { marginLeft: 8, color: RcsColors.brownLight, fontSize: 22, lineHeight: 25 },
+  groupChevron: { marginLeft: 8, color: colors.brownLight, fontSize: 22, lineHeight: 25 },
   groupItems: {
     paddingVertical: 5,
     marginTop: 3,
     marginLeft: 13,
     borderLeftWidth: 1,
-    borderLeftColor: RcsColors.border,
+    borderLeftColor: colors.border,
   },
   childLink: {
     minHeight: 34,
@@ -314,10 +319,10 @@ const styles = StyleSheet.create({
     paddingLeft: 15,
     paddingRight: 12,
   },
-  childLinkText: { flex: 1, color: RcsColors.grayMuted, fontSize: 12, lineHeight: 17 },
-  activeLink: { backgroundColor: RcsColors.yellowLight },
-  activeLinkText: { color: RcsColors.brownDark, fontWeight: '800' },
-  hoveredLink: { backgroundColor: RcsColors.grayLight },
+  childLinkText: { flex: 1, color: colors.grayMuted, fontSize: 12, lineHeight: 17 },
+  activeLink: { backgroundColor: colors.yellowLight },
+  activeLinkText: { color: colors.brownDark, fontWeight: '800' },
+  hoveredLink: { backgroundColor: colors.grayLight },
   pressedLink: { opacity: 0.75 },
   disabledLinkText: { color: '#A8A39A' },
   comingSoon: {
@@ -326,8 +331,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: RcsColors.grayLight,
-    color: RcsColors.grayMuted,
+    backgroundColor: colors.grayLight,
+    color: colors.grayMuted,
     fontSize: 9,
     fontWeight: '700',
   },
@@ -337,11 +342,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 20,
-    backgroundColor: RcsColors.background,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: RcsColors.border,
+    borderTopColor: colors.border,
   },
-  phaseBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: RcsColors.yellowLight },
-  phaseBadgeText: { color: RcsColors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  version: { color: RcsColors.grayMuted, fontSize: 10, lineHeight: 15, fontWeight: '600' },
-});
+  phaseBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.yellowLight },
+  phaseBadgeText: { color: colors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  version: { color: colors.grayMuted, fontSize: 10, lineHeight: 15, fontWeight: '600' },
+  });
+}

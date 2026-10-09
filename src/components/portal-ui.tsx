@@ -1,8 +1,10 @@
-import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RcsColors } from '@/constants/theme';
+import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { useAppTheme } from '@/contexts/theme-context';
 
 export function PortalPage({
   children,
@@ -11,6 +13,7 @@ export function PortalPage({
   children: ReactNode;
   maxWidth?: number;
 }) {
+  const styles = usePortalStyles();
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <ScrollView
@@ -32,6 +35,7 @@ export function PageHeading({
   title: string;
   description: string;
 }) {
+  const styles = usePortalStyles();
   return (
     <View style={styles.heading}>
       <Text style={styles.eyebrow}>{eyebrow}</Text>
@@ -42,6 +46,7 @@ export function PageHeading({
 }
 
 export function PreviewNotice({ children }: { children: ReactNode }) {
+  const styles = usePortalStyles();
   return (
     <View style={styles.notice}>
       <Text style={styles.noticeTitle}>Not connected to employee records</Text>
@@ -57,6 +62,7 @@ export function EmptyState({
   title: string;
   description: string;
 }) {
+  const styles = usePortalStyles();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
@@ -85,6 +91,7 @@ export function ChoicePicker({
   onOpenChange?: (isOpen: boolean) => void;
   open?: boolean;
 }) {
+  const styles = usePortalStyles();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setPickerOpen = (isOpen: boolean) => {
@@ -151,6 +158,7 @@ export function PortalCalendar({
   onChangeMonth: (amount: number, clearSelection?: boolean) => void;
   onGoToday: () => void;
 }) {
+  const styles = usePortalStyles();
   const [view, setView] = useState<'days' | 'months' | 'years' | 'decades'>('days');
   const [pickerYear, setPickerYear] = useState(month.getFullYear());
   const year = month.getFullYear();
@@ -360,7 +368,14 @@ export function PortalCalendar({
   );
 }
 
-const styles = StyleSheet.create({
+function usePortalStyles() {
+  const { colorScheme } = useAppTheme();
+  const palette = getPaletteForScheme(colorScheme);
+  return useMemo(() => createStyles(palette), [palette]);
+}
+
+function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+  return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
   page: { width: '100%', alignSelf: 'center', padding: 28, paddingBottom: 48 },
   heading: { marginBottom: 24 },
@@ -477,7 +492,8 @@ const styles = StyleSheet.create({
   calendarChoice: { width: '25%', height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   adjacentChoice: { opacity: 0.45 },
   adjacentChoiceText: { color: RcsColors.grayMuted },
-  selectedDay: { backgroundColor: RcsColors.brown },
+  selectedDay: { backgroundColor: RcsColors.brownSurface },
   dayText: { color: RcsColors.grayDark, fontSize: 13 },
   selectedDayText: { color: RcsColors.white, fontWeight: '800' },
-});
+  });
+}

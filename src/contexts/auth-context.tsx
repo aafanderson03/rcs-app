@@ -22,34 +22,41 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const configuredApiUrl = process.env.EXPO_PUBLIC_AUTH_API_URL;
+const isProduction = process.env.NODE_ENV === 'production';
 
 function getAuthApiUrl() {
   const isAndroidEmulator = Platform.OS === 'android' && !Device.isDevice;
+  const configuredUrl = configuredApiUrl?.trim().replace(/\/+$/, '');
 
   if (Platform.OS === 'web') {
-    if (!configuredApiUrl) return 'http://localhost:4100';
+    if (!configuredUrl) {
+      if (isProduction && typeof window !== 'undefined') return window.location.origin;
+      return 'http://localhost:4100';
+    }
 
-    const configuredUrl = new URL(configuredApiUrl);
-    const configuredHost = configuredUrl.hostname.toLowerCase();
+    const parsedUrl = new URL(configuredUrl);
+    const configuredHost = parsedUrl.hostname.toLowerCase();
     const isLoopback = ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(configuredHost);
     const pageHost = typeof window === 'undefined' ? '' : window.location.hostname.toLowerCase();
     const isPageLoopback = ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(pageHost);
 
     if (isLoopback && pageHost && !isPageLoopback) {
-      return `${configuredUrl.protocol}//${pageHost}:${configuredUrl.port || '4100'}`;
+      return `${parsedUrl.protocol}//${pageHost}:${parsedUrl.port || '4100'}`;
     }
-    return configuredApiUrl;
+    return configuredUrl;
   }
 
-  if (configuredApiUrl) {
-    const configuredHost = new URL(configuredApiUrl).hostname.toLowerCase();
+  if (configuredUrl) {
+    const configuredHost = new URL(configuredUrl).hostname.toLowerCase();
     const isLoopback = ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(configuredHost);
-    if (!isLoopback) return configuredApiUrl;
+    if (!isLoopback) return configuredUrl;
     if (isAndroidEmulator) {
-      const configuredUrl = new URL(configuredApiUrl);
-      return `${configuredUrl.protocol}//10.0.2.2:${configuredUrl.port || '4100'}`;
+      const parsedUrl = new URL(configuredUrl);
+      return `${parsedUrl.protocol}//10.0.2.2:${parsedUrl.port || '4100'}`;
     }
   }
+
+  if (isProduction) return '';
 
   if (isAndroidEmulator) return 'http://10.0.2.2:4100';
 
@@ -66,6 +73,11 @@ function getAuthApiUrl() {
 
 const apiUrl = getAuthApiUrl();
 
+export function authApiEndpoint(path: string) {
+  if (!apiUrl) throw new Error('Set EXPO_PUBLIC_AUTH_API_URL in the production app build.');
+  return `${apiUrl}${path}`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -74,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     token,
     async signIn(username, password) {
-      const response = await fetch(`${apiUrl}/api/auth/login`, {
+      const response = await fetch(authApiEndpoint('/api/auth/login'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -89,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async signOut() {
       if (token) {
         try {
-          await fetch(`${apiUrl}/api/auth/logout`, {
+          await fetch(authApiEndpoint('/api/auth/logout'), {
             method: 'POST',
             headers: { authorization: `Bearer ${token}` },
           });

@@ -46,7 +46,7 @@ export default function DashboardScreen() {
         title="Dashboard"
         description="A clear overview of requests and their current status."
       />
-      <PreviewNotice>Fictional request activity for presentation only. These examples do not represent live employee records.</PreviewNotice>
+      <PreviewNotice>Request totals are based on applications saved to your account.</PreviewNotice>
 
       <View style={styles.filters}>
         <DateField label="From" value={from} onChangeText={setFrom} />
@@ -66,8 +66,8 @@ export default function DashboardScreen() {
             <Text style={styles.summaryEyebrow}>REQUEST OVERVIEW</Text>
             <Text style={styles.summaryTitle}>Pending applications</Text>
             <Text style={styles.summaryValue}>{pendingCount}</Text>
-            <Text style={styles.summaryNote}>Sample requests awaiting review</Text>
-            <Text style={styles.summaryNote}>{applications.length} sample requests in total</Text>
+            <Text style={styles.summaryNote}>Applications awaiting review</Text>
+            <Text style={styles.summaryNote}>{applications.length} applications in total</Text>
             <Text style={styles.chartTitle}>Applications by status</Text>
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>

@@ -154,6 +154,7 @@ export function PortalCalendar({
   onChangeMonth,
   onGoToday,
   markedDates = [],
+  fillHeight = false,
 }: {
   month: Date;
   selectedDate: Date | null;
@@ -161,6 +162,7 @@ export function PortalCalendar({
   onChangeMonth: (amount: number, clearSelection?: boolean) => void;
   onGoToday: () => void;
   markedDates?: string[];
+  fillHeight?: boolean;
 }) {
   const styles = usePortalStyles();
   const { width } = useWindowDimensions();
@@ -200,7 +202,7 @@ export function PortalCalendar({
   };
 
   return (
-    <View style={[styles.calendarCard, compact && styles.mobileCalendarCard, veryCompact && styles.compactCalendarCard]}>
+    <View style={[styles.calendarCard, compact && styles.mobileCalendarCard, veryCompact && styles.compactCalendarCard, fillHeight && styles.fillHeightCalendarCard]}>
       <View style={[styles.calendarHeader, compact && styles.mobileCalendarHeader, veryCompact && styles.compactCalendarHeader]}>
         <Pressable
           accessibilityRole="button"
@@ -389,34 +391,35 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   page: { width: '100%', alignSelf: 'center', padding: 28, paddingBottom: 48 },
   mobilePage: { padding: 20, paddingBottom: 36 },
   compactPage: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 26 },
-  heading: { marginBottom: 24 },
-  eyebrow: { color: RcsColors.brownLight, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  title: { marginTop: 6, color: RcsColors.brownDark, fontSize: 32, fontWeight: '800' },
-  description: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 14, lineHeight: 21 },
+  heading: { marginBottom: 24, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
+  eyebrow: { color: RcsColors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
+  title: { marginTop: 8, color: RcsColors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
+  description: { maxWidth: 680, marginTop: 7, color: RcsColors.grayMuted, fontSize: 14, lineHeight: 21 },
   notice: {
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     marginBottom: 18,
-    borderRadius: 12,
+    borderRadius: 3,
     backgroundColor: RcsColors.yellowLight,
-    borderWidth: 1,
-    borderColor: RcsColors.yellow,
+    borderLeftWidth: 3,
+    borderLeftColor: RcsColors.yellow,
   },
-  noticeTitle: { color: RcsColors.brown, fontSize: 13, fontWeight: '800' },
+  noticeTitle: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   noticeText: { marginTop: 5, color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
   empty: {
     alignItems: 'center',
     padding: 32,
-    borderRadius: 15,
+    borderRadius: 4,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
   emptyIcon: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
+    borderRadius: 3,
     backgroundColor: RcsColors.yellowLight,
   },
   emptyIconText: { color: RcsColors.brown, fontSize: 20, fontWeight: '700' },
@@ -438,7 +441,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 13,
-    borderRadius: 10,
+    borderRadius: 4,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -456,7 +459,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     maxHeight: 280,
     marginTop: 4,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 4,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -476,12 +479,13 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   calendarCard: {
     maxWidth: 850,
     padding: 22,
-    borderRadius: 16,
+    borderRadius: 4,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
-  mobileCalendarCard: { padding: 14, borderRadius: 13 },
+  fillHeightCalendarCard: { flex: 1 },
+  mobileCalendarCard: { padding: 14, borderRadius: 4 },
   compactCalendarCard: { padding: 9 },
   calendarHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   mobileCalendarHeader: { gap: 6, marginBottom: 14 },
@@ -491,11 +495,11 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 11,
+    borderRadius: 4,
     backgroundColor: RcsColors.yellowLight,
   },
   monthButtonText: { color: RcsColors.brown, fontSize: 26, lineHeight: 30 },
-  mobileMonthButton: { width: 40, height: 44, borderRadius: 9 },
+  mobileMonthButton: { width: 40, height: 44, borderRadius: 4 },
   compactMonthButton: { width: 38, height: 44 },
   monthHeading: { flex: 1 },
   headingButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -503,14 +507,14 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   mobileMonthTitle: { fontSize: 14 },
   compactMonthTitle: { fontSize: 12 },
   headingChevron: { color: RcsColors.brownLight, fontSize: 18 },
-  todayButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 10, backgroundColor: RcsColors.grayLight },
+  todayButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 4, backgroundColor: RcsColors.grayLight },
   mobileTodayButton: { minHeight: 44, paddingHorizontal: 8, paddingVertical: 9 },
   compactTodayButton: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 8 },
   todayButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: `${100 / 7}%`, paddingVertical: 10, color: RcsColors.grayMuted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  dayCell: { width: `${100 / 7}%`, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  calendarChoice: { width: '25%', height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  dayCell: { width: `${100 / 7}%`, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 4 },
+  calendarChoice: { width: '25%', height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 4 },
   adjacentChoice: { opacity: 0.45 },
   adjacentChoiceText: { color: RcsColors.grayMuted },
   selectedDay: { backgroundColor: RcsColors.brownSurface },

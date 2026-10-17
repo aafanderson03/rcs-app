@@ -1,6 +1,14 @@
 import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+} from '@expo-google-fonts/montserrat';
 import { Image } from 'expo-image';
+import { useFonts } from 'expo-font';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -8,10 +16,14 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { DesktopSidebar } from '@/components/desktop-sidebar';
 import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
 import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
+
+const SPLASH_HOLD_DURATION_MS = 3000;
+const SPLASH_FADE_DURATION_MS = 500;
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch((error: unknown) => {
@@ -34,6 +46,14 @@ export default function RootLayout() {
 function RootLayoutContent() {
   const { colorScheme, mode, setMode, storageError } = useAppTheme();
   const { user } = useAuth();
+  const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
+  const [fontsLoaded, fontError] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+  });
   const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
@@ -45,6 +65,7 @@ function RootLayoutContent() {
   const [splashProgress] = useState(() => new Animated.Value(0));
   const [splashOpacity] = useState(() => new Animated.Value(1));
   const isDesktop = Platform.OS === 'web' && width >= 960;
+  const fontReady = Platform.OS === 'web' || fontsLoaded || fontError !== null;
   const isPublicPage = pathname === '/' || pathname === '/login' || !user;
   const theme = {
     ...DefaultTheme,
@@ -68,6 +89,12 @@ function RootLayoutContent() {
   }, [pathname, router, user]);
 
   useEffect(() => {
+    if (!fontReady) return;
+
+    if (fontError) {
+      console.error('Unable to load the Montserrat fonts; using the platform fallback.', fontError);
+    }
+
     if (Platform.OS !== 'web') {
       SplashScreen.hideAsync().catch((error: unknown) => {
         console.error('Unable to hide the native splash screen.', error);
@@ -82,20 +109,22 @@ function RootLayoutContent() {
     });
     const splashAnimation = Animated.timing(splashOpacity, {
       toValue: 0,
-      duration: 400,
+      duration: SPLASH_FADE_DURATION_MS,
       easing: Easing.in(Easing.cubic),
       useNativeDriver: Platform.OS !== 'web',
     });
     artworkAnimation.start();
     const splashTimer = setTimeout(() => splashAnimation.start(({ finished }) => {
       if (finished) setSplashVisible(false);
-    }), 550);
+    }), SPLASH_HOLD_DURATION_MS);
     return () => {
       clearTimeout(splashTimer);
       artworkAnimation.stop();
       splashAnimation.stop();
     };
-  }, [splashOpacity, splashProgress]);
+  }, [fontError, fontReady, splashOpacity, splashProgress]);
+
+  if (!fontReady) return null;
 
   return (
     <ThemeProvider value={theme}>
@@ -145,18 +174,20 @@ function RootLayoutContent() {
                   style={({ pressed }) => [styles.brand, pressed && styles.brandPressed]}
                 >
                   <Image
-                    source={require('@/assets/images/rcs-supermarket-logo.png')}
+                    source={companyBranding.logo}
                     contentFit="contain"
                     style={[styles.brandLogo, isDesktop && styles.desktopBrandLogo]}
-                    accessibilityLabel="RCS Supermarket home"
+                    accessibilityLabel={`${companyBranding.name} home`}
                   />
                   {isDesktop ? <View style={styles.brandDivider} /> : null}
                   {isDesktop ? (
                     <View style={styles.brandCopy}>
                       <Text style={styles.brandTitle}>Employee Portal</Text>
-                      <Text style={styles.brandSubtitle}>RCS Supermarket</Text>
+                      <Text style={styles.brandSubtitle} numberOfLines={1}>{companyBranding.name}</Text>
                     </View>
-                  ) : null}
+                  ) : (
+                    <Text style={styles.mobileBrandName} numberOfLines={1}>{companyBranding.name}</Text>
+                  )}
                 </Pressable>
               </View>
               <View style={styles.themeControl}>
@@ -271,21 +302,22 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     zIndex: 2,
   },
   desktopTopBar: { height: 84, paddingHorizontal: 28 },
-  brandGroup: { flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
-  brand: { height: 68, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  brandLogo: { width: 116, height: 68 },
-  desktopBrandLogo: { width: 148, height: 76 },
+  brandGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
+  brand: { height: 68, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
+  brandLogo: { width: 112, height: 64, borderRadius: 4 },
+  desktopBrandLogo: { width: 112, height: 64 },
   brandDivider: { width: 1, height: 38, marginHorizontal: 18, backgroundColor: colors.border },
-  brandCopy: { gap: 3 },
+  brandCopy: { flexShrink: 1, gap: 3 },
   brandTitle: { color: colors.brownDark, fontSize: 15, fontWeight: '800' },
   brandSubtitle: { color: colors.grayMuted, fontSize: 12 },
+  mobileBrandName: { flexShrink: 1, minWidth: 0, marginLeft: 8, color: colors.brownDark, fontSize: 12, fontWeight: '700' },
   brandPressed: { opacity: 0.75 },
   menuButton: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: colors.grayLight,
   },
   menuButtonPressed: { opacity: 0.7 },
@@ -300,7 +332,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: colors.grayLight,
   },
   themeButtonText: { color: colors.brownDark, fontSize: 14, fontWeight: '700' },

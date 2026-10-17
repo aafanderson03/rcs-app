@@ -72,13 +72,13 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    sans: 'system-ui',
+    sans: 'Montserrat_400Regular',
     serif: 'ui-serif',
     rounded: 'ui-rounded',
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    sans: 'Montserrat_400Regular',
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',

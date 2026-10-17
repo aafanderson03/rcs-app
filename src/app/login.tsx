@@ -1,18 +1,31 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ResponsiveText as Text } from '@/components/responsive-text';
+import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
+import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
+import { demoEmployeeNames } from '@/data/demo-data';
+
+const demoUsers = [
+  { username: 'demo', name: demoEmployeeNames[0], company: 'RCS' },
+  { username: 'demo-brilliant', name: demoEmployeeNames[1], company: 'Brilliant' },
+  { username: 'demo-tlz', name: demoEmployeeNames[2], company: 'TLZ' },
+  { username: 'demo-fsi', name: demoEmployeeNames[3], company: 'Friendship' },
+  { username: 'demo-mfsc', name: demoEmployeeNames[4], company: 'Metro Federal Steel' },
+  { username: 'demo-cgci', name: demoEmployeeNames[5], company: 'Core Gateway Colleges' },
+  { username: 'demo-spf', name: demoEmployeeNames[6], company: 'Sweetpack Foods' },
+];
 
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
   const { colorScheme } = useAppTheme();
+  const loginBrand = getCompanyBranding();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 800;
   const isMobile = width < 600;
@@ -48,7 +61,7 @@ export default function LoginScreen() {
         <View style={[styles.loginShell, isDesktop && styles.desktopLoginShell]}>
           <View style={[styles.brandPanel, isCompact && styles.compactBrandPanel]}>
             <View style={styles.brandTopLine} />
-            <Image source={require('@/assets/images/rcs-supermarket-logo.png')} contentFit="contain" style={[styles.logo, isCompact && styles.compactLogo]} accessibilityLabel="RCS Supermarket" />
+            <Image source={loginBrand.logo} contentFit="contain" style={[styles.logo, isCompact && styles.compactLogo]} accessibilityLabel={loginBrand.name} />
             <View style={styles.brandDivider} />
             <Text style={styles.brandLabel}>EMPLOYEE PORTAL</Text>
           </View>
@@ -59,7 +72,19 @@ export default function LoginScreen() {
           <View style={styles.notice}>
             <Text style={styles.noticeText}>Local prototype · Not connected to production systems</Text>
           </View>
-          {__DEV__ ? <Text style={styles.demoCredentials}>Demo login: demo / local-demo-password-123</Text> : null}
+          {__DEV__ ? (
+            <View style={styles.demoCredentials}>
+              <Text style={styles.demoCredentialsTitle}>Demo accounts</Text>
+              {demoUsers.map((demoUser) => (
+                <Text key={demoUser.username} style={styles.demoCredentialRow}>
+                  {demoUser.name} · {demoUser.company} — {demoUser.username}
+                </Text>
+              ))}
+              <Text style={styles.demoCredentialsHint}>
+                Shared demo password: demo1234. For local setup, AUTH_TEST_PASSWORD can be changed in .env.local.
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.field}>
             <Text style={styles.label}>Username</Text>
@@ -95,31 +120,34 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     page: { flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: colors.background },
     compactPage: { padding: 14 },
     desktopPage: { padding: 36 },
-    loginShell: { width: '100%', maxWidth: 470, alignSelf: 'center', overflow: 'hidden', borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, elevation: 2 },
+    loginShell: { width: '100%', maxWidth: 470, alignSelf: 'center', overflow: 'hidden', borderRadius: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     desktopLoginShell: { maxWidth: 470 },
     brandPanel: { minHeight: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingTop: 9, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     compactBrandPanel: { minHeight: 78, paddingHorizontal: 14 },
     brandTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: colors.brown },
-    logo: { width: 116, height: 70, marginRight: 16 },
-    compactLogo: { width: 92, height: 58, marginRight: 10 },
+    logo: { width: 112, height: 64, marginRight: 16, borderRadius: 4 },
+    compactLogo: { width: 112, height: 64, marginRight: 10 },
     brandDivider: { width: 1, height: 34, marginRight: 16, backgroundColor: colors.border },
     brandLabel: { color: colors.grayDark, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
     card: { width: '100%', paddingHorizontal: 28, paddingTop: 25, paddingBottom: 22, backgroundColor: colors.surface },
     compactCard: { paddingHorizontal: 19, paddingTop: 22 },
-    title: { color: colors.brownDark, fontSize: 25, fontWeight: '800' },
+    title: { color: colors.text, fontSize: 25, fontWeight: '700', letterSpacing: -0.5 },
     description: { marginTop: 5, marginBottom: 18, color: colors.grayMuted, fontSize: 13, lineHeight: 19 },
     notice: { paddingVertical: 8, paddingHorizontal: 10, marginBottom: 18, borderRadius: 5, backgroundColor: colors.yellowLight, borderLeftWidth: 2, borderLeftColor: colors.yellow },
     noticeText: { color: colors.grayDark, fontSize: 10, lineHeight: 15 },
-    demoCredentials: { marginTop: -8, marginBottom: 16, color: colors.brownLight, fontSize: 11, fontWeight: '700' },
+    demoCredentials: { marginTop: -8, marginBottom: 16, padding: 10, borderRadius: 4, backgroundColor: colors.background },
+    demoCredentialsTitle: { marginBottom: 4, color: colors.brownDark, fontSize: 11, fontWeight: '800' },
+    demoCredentialRow: { color: colors.brownLight, fontSize: 10, lineHeight: 16, fontWeight: '600' },
+    demoCredentialsHint: { marginTop: 5, color: colors.grayMuted, fontSize: 9, lineHeight: 13 },
     field: { marginBottom: 15 },
     label: { marginBottom: 7, color: colors.grayDark, fontSize: 12, fontWeight: '700' },
-    input: { minHeight: 50, paddingHorizontal: 14, borderRadius: 7, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, color: colors.text, fontSize: 14 },
+    input: { minHeight: 50, paddingHorizontal: 14, borderRadius: 4, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, color: colors.text, fontSize: 14 },
     mobileInput: { fontSize: 16 },
     passwordRow: { flexDirection: 'row', alignItems: 'center' },
     passwordInput: { flex: 1, paddingRight: 64 },
     showPassword: { position: 'absolute', right: 4, minWidth: 56, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     showPasswordText: { color: colors.brown, fontSize: 11, fontWeight: '700' },
-    submitButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 3, borderRadius: 7, backgroundColor: colors.brown },
+    submitButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 3, borderRadius: 4, backgroundColor: colors.brown },
     submitButtonText: { color: colors.white, fontSize: 13, fontWeight: '800' },
     disabled: { opacity: 0.6 },
     message: { marginTop: 13, color: colors.danger, fontSize: 12, lineHeight: 18 },

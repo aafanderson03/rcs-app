@@ -33,6 +33,12 @@ export default function DashboardScreen() {
     (!from || item.submittedAt >= from) && (!to || item.submittedAt <= to)
   );
   const pendingCount = applications.filter((item) => item.status === 'Pending').length;
+  const categoryCounts = transactionCategories.map((category) => {
+    const categoryRows = rows.filter((item) => categoryMatches(category, item.type));
+    const pending = categoryRows.filter((item) => item.status === 'Pending').length;
+    return { category, pending, done: categoryRows.length - pending, total: categoryRows.length };
+  });
+  const maxCategoryCount = Math.max(1, ...categoryCounts.map((item) => item.total));
 
   return (
     <PortalPage>
@@ -62,6 +68,37 @@ export default function DashboardScreen() {
             <Text style={styles.summaryValue}>{pendingCount}</Text>
             <Text style={styles.summaryNote}>Sample requests awaiting review</Text>
             <Text style={styles.summaryNote}>{applications.length} sample requests in total</Text>
+            <Text style={styles.chartTitle}>Applications by status</Text>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={styles.doneLegendSwatch} />
+                <Text style={styles.legendLabel}>Done</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={styles.pendingLegendSwatch} />
+                <Text style={styles.legendLabel}>Pending</Text>
+              </View>
+            </View>
+            <View style={styles.chartCategoryList}>
+              {categoryCounts.map(({ category, done, pending }) => (
+                <View key={category} style={styles.chartCategoryRow}>
+                  <Text style={styles.chartCategoryName} numberOfLines={1}>{category}</Text>
+                  <View
+                    accessible
+                    accessibilityLabel={`${category}: ${done} done, ${pending} pending`}
+                    style={styles.categoryBarTrack}
+                  >
+                    {done > 0 ? (
+                      <View style={[styles.categoryBarDone, { width: `${(done / maxCategoryCount) * 100}%` }]} />
+                    ) : null}
+                    {pending > 0 ? (
+                      <View style={[styles.categoryBarPending, { width: `${(pending / maxCategoryCount) * 100}%` }]} />
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.chartNote}>Done includes approved, disapproved, or cancelled.</Text>
         </View>
 
         <View style={[styles.categoriesCard, isDesktop && styles.desktopCategoriesCard]}>
@@ -70,11 +107,11 @@ export default function DashboardScreen() {
               Filtered by {status.toLowerCase()}{from || to ? ` · ${from || 'any date'} to ${to || 'today'}` : ''}
             </Text>
             <View style={styles.categoryList}>
-              {transactionCategories.map((category) => (
+              {categoryCounts.map(({ category, total }) => (
                 <View key={category} style={styles.categoryRow}>
                   <View style={styles.categoryDot} />
                   <Text style={styles.categoryName}>{category}</Text>
-                  <Text style={styles.categoryValue}>{rows.filter((item) => categoryMatches(category, item.type)).length}</Text>
+                  <Text style={styles.categoryValue}>{total}</Text>
                 </View>
               ))}
             </View>
@@ -137,13 +174,13 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     elevation: 10,
   },
   contentColumns: { gap: 18 },
-  desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 22 },
+  desktopContentColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 22 },
   dateField: { flexGrow: 1, flexBasis: 190 },
   filterLabel: { marginBottom: 7, color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
   dateInput: {
     height: 46,
     paddingHorizontal: 13,
-    borderRadius: 10,
+    borderRadius: 4,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -153,26 +190,41 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   statusFilter: { flexGrow: 1, flexBasis: 230 },
   summaryCard: {
     minWidth: 0,
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: RcsColors.brownSurface,
+    padding: 21,
+    borderRadius: 4,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
   },
   desktopSummaryCard: { flex: 1 },
-  summaryEyebrow: { color: RcsColors.yellow, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  summaryTitle: { marginTop: 10, color: RcsColors.white, fontSize: 18, fontWeight: '700' },
-  summaryValue: { marginTop: 4, color: RcsColors.white, fontSize: 42, fontWeight: '800' },
-  summaryNote: { color: '#E4D9C9', fontSize: 12 },
+  summaryEyebrow: { color: RcsColors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  summaryTitle: { marginTop: 10, color: RcsColors.text, fontSize: 16, fontWeight: '700' },
+  summaryValue: { marginTop: 4, color: RcsColors.brown, fontSize: 38, fontWeight: '700' },
+  summaryNote: { color: RcsColors.grayMuted, fontSize: 12 },
+  chartTitle: { marginTop: 22, color: RcsColors.text, fontSize: 14, fontWeight: '700' },
   categoriesCard: {
     minWidth: 0,
     padding: 22,
-    borderRadius: 16,
+    borderRadius: 4,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
   desktopCategoriesCard: { flex: 1.25 },
-  cardTitle: { color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
+  cardTitle: { color: RcsColors.text, fontSize: 17, fontWeight: '700' },
   cardDescription: { marginTop: 5, color: RcsColors.grayMuted, fontSize: 12 },
+  chartLegend: { flexDirection: 'row', gap: 16, marginTop: 14 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  doneLegendSwatch: { width: 9, height: 9, borderRadius: 3, backgroundColor: RcsColors.brown },
+  pendingLegendSwatch: { width: 9, height: 9, borderRadius: 3, backgroundColor: RcsColors.yellowDeep },
+  legendLabel: { color: RcsColors.grayMuted, fontSize: 11, fontWeight: '600' },
+  chartCategoryList: { marginTop: 8 },
+  chartCategoryRow: { height: 23, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chartCategoryName: { width: 92, color: RcsColors.grayDark, fontSize: 10 },
+  categoryBarTrack: { height: 9, flex: 1, flexDirection: 'row', overflow: 'hidden', borderRadius: 5, backgroundColor: RcsColors.grayLight },
+  categoryBarDone: { height: '100%', backgroundColor: RcsColors.brown },
+  categoryBarPending: { height: '100%', backgroundColor: RcsColors.yellowDeep },
+  chartNote: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 9, lineHeight: 13 },
   categoryList: { marginVertical: 17 },
   categoryRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: RcsColors.grayLight },
   categoryDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: RcsColors.yellowDeep },

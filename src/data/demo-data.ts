@@ -430,7 +430,7 @@ function demoMilestoneDate(index: number, count: number) {
   });
 }
 
-const demoBirthdayNames = [
+export const demoEmployeeNames = [
   "Mia Santos",
   "Rafael Cruz",
   "Bianca Reyes",
@@ -451,9 +451,9 @@ const demoAnniversaries = [
 ];
 
 export const demoMilestones = {
-  birthdays: demoBirthdayNames.map((name, index) => ({
+  birthdays: demoEmployeeNames.map((name, index) => ({
     name,
-    date: demoMilestoneDate(index, demoBirthdayNames.length),
+    date: demoMilestoneDate(index, demoEmployeeNames.length),
   })),
   anniversaries: demoAnniversaries.map((milestone, index) => ({
     ...milestone,

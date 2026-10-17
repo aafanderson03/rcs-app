@@ -11,6 +11,15 @@ import {
   type TextStyle,
 } from 'react-native';
 
+function getAppFontFamily(weight: TextStyle['fontWeight']) {
+  const numericWeight = typeof weight === 'number' ? weight : Number(weight);
+  if (numericWeight >= 800) return 'Montserrat_800ExtraBold';
+  if (numericWeight >= 700 || weight === 'bold') return 'Montserrat_700Bold';
+  if (numericWeight >= 600) return 'Montserrat_600SemiBold';
+  if (numericWeight >= 500) return 'Montserrat_500Medium';
+  return 'Montserrat_400Regular';
+}
+
 function scaleStyle(
   style: StyleProp<TextStyle>,
   width: number,
@@ -42,13 +51,23 @@ export const ResponsiveText = forwardRef<NativeText, TextProps>(function Respons
   ref,
 ) {
   const { width } = useWindowDimensions();
-  return <NativeText ref={ref} {...props} style={scaleStyle(style, width)} />;
+  const flattenedStyle = StyleSheet.flatten(style);
+  const fontFamily = flattenedStyle?.fontFamily ?? getAppFontFamily(flattenedStyle?.fontWeight);
+  return <NativeText ref={ref} {...props} style={[{ fontFamily }, scaleStyle(style, width)]} />;
 });
 
 export const ResponsiveTextInput = forwardRef<NativeTextInput, TextInputProps>(
   function ResponsiveTextInput({ style, ...props }, ref) {
     const { width } = useWindowDimensions();
     const minimumFontSize = Platform.OS === 'web' && width < 600 ? 16 : 0;
-    return <NativeTextInput ref={ref} {...props} style={scaleStyle(style, width, minimumFontSize)} />;
+    const flattenedStyle = StyleSheet.flatten(style);
+    const fontFamily = flattenedStyle?.fontFamily ?? getAppFontFamily(flattenedStyle?.fontWeight);
+    return (
+      <NativeTextInput
+        ref={ref}
+        {...props}
+        style={[{ fontFamily }, scaleStyle(style, width, minimumFontSize)]}
+      />
+    );
   },
 );

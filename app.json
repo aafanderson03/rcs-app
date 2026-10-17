@@ -34,7 +34,8 @@
           "image": "./assets/images/rcs-supermarket-logo.png",
           "imageWidth": 170
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

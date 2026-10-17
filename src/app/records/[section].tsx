@@ -68,7 +68,7 @@ export default function EmployeeRecordScreen() {
 
 function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
-    card: { padding: 18, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    card: { padding: 18, borderRadius: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     row: { gap: 6, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     label: { color: colors.grayMuted, fontSize: 11, fontWeight: '700' },
     value: { color: colors.text, fontSize: 13, lineHeight: 19 },

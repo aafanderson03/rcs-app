@@ -19,25 +19,39 @@ try {
   const companySlug = process.env.AUTH_TEST_COMPANY || companies[0].slug;
   const employeeType = process.env.AUTH_TEST_EMPLOYEE_TYPE || 'employee';
   const username = (process.env.AUTH_TEST_USERNAME || 'demo').trim();
-  const displayName = process.env.AUTH_TEST_DISPLAY_NAME || 'Demo Employee';
   if (!companies.some((company) => company.slug === companySlug)) throw new Error('AUTH_TEST_COMPANY is not a known company slug.');
   if (!employeeTypes.includes(employeeType)) throw new Error('AUTH_TEST_EMPLOYEE_TYPE must be employee, merchandiser, guard, or subcontractor.');
   if (!username) throw new Error('AUTH_TEST_USERNAME cannot be empty.');
+  if (process.env.AUTH_TEST_DISPLAY_NAME) {
+    console.warn('AUTH_TEST_DISPLAY_NAME is ignored; demo account names are assigned from the employee sample roster.');
+  }
 
   const generatedPassword = !process.env.AUTH_TEST_PASSWORD;
   const password = process.env.AUTH_TEST_PASSWORD || randomBytes(20).toString('base64url');
-  if (password.length < 12) throw new Error('AUTH_TEST_PASSWORD must be at least 12 characters.');
-  const { salt, hash } = await hashPassword(password);
-  database.prepare(
+  if (password.length < 8) throw new Error('AUTH_TEST_PASSWORD must be at least 8 characters.');
+  const saveAccount = database.prepare(
     `INSERT INTO employee_accounts (company_slug, username, display_name, employee_type, password_salt, password_hash)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (company_slug, username) DO UPDATE SET
        display_name = excluded.display_name, employee_type = excluded.employee_type,
        password_salt = excluded.password_salt, password_hash = excluded.password_hash, active = 1`
-  ).run(companySlug, username, displayName, employeeType, salt, hash);
+  );
+  const testAccounts = companies.map((company) => ({
+    company,
+    username: company.slug === companySlug ? username : company.demoUsername,
+    displayName: company.demoDisplayName,
+  }));
+  const usernames = testAccounts.map((account) => account.username.toLowerCase());
+  if (new Set(usernames).size !== usernames.length) {
+    throw new Error('Demo usernames must be unique across companies. Update AUTH_TEST_USERNAME or AUTH_TEST_COMPANY.');
+  }
+  for (const account of testAccounts) {
+    const { salt, hash } = await hashPassword(password);
+    saveAccount.run(account.company.slug, account.username, account.displayName, employeeType, salt, hash);
+  }
 
-  console.log(`SQLite database ready at ${databasePath}. Local test account: ${username} (${companySlug}, ${employeeType}).`);
-  if (generatedPassword) console.log(`Generated test password (shown once): ${password}`);
+  console.log(`SQLite database ready at ${databasePath}. Local demo accounts (${employeeType}): ${testAccounts.map(({ username: demoUsername, displayName: demoName }) => `${demoUsername} (${demoName})`).join(', ')}.`);
+  if (generatedPassword) console.log(`Generated shared demo password (shown once): ${password}`);
 } finally {
   database.close();
 }

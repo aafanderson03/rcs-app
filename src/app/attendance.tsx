@@ -53,6 +53,7 @@ export default function AttendanceScreen() {
             onChangeMonth={changeMonth}
             onGoToday={goToday}
             markedDates={markedDates}
+            fillHeight={isDesktop}
           />
         </View>
         <View style={[styles.detailsColumn, isDesktop && styles.desktopDetailsColumn]}>
@@ -90,7 +91,7 @@ export default function AttendanceScreen() {
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   contentColumns: { gap: 18 },
-  desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 22 },
+  desktopContentColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 22 },
   calendarColumn: { minWidth: 0 },
   desktopCalendarColumn: { flex: 1.2 },
   detailsColumn: { minWidth: 0 },
@@ -102,7 +103,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     fontSize: 18,
     fontWeight: '800',
   },
-  recordCard: { padding: 18, borderRadius: 14, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
+  recordCard: { padding: 18, borderRadius: 4, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
   recordTop: { gap: 6, marginBottom: 12 },
   recordStatus: { color: RcsColors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   lateStatus: { color: RcsColors.danger },
@@ -114,12 +115,12 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   totalLabel: { color: RcsColors.grayMuted, fontSize: 12 },
   totalValue: { color: RcsColors.brown, fontSize: 13, fontWeight: '800' },
   hoursNote: { marginTop: 5, color: RcsColors.grayMuted, fontSize: 11 },
-  lateSummary: { marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: RcsColors.yellowLight },
+  lateSummary: { marginTop: 14, padding: 12, borderRadius: 4, backgroundColor: RcsColors.yellowLight },
   lateSummaryTitle: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '800' },
   lateSummaryCopy: { marginTop: 4, color: RcsColors.grayDark, fontSize: 12 },
   lateSummaryStatus: { marginTop: 5, color: RcsColors.brown, fontSize: 11, fontWeight: '700' },
   lateThresholdReached: { color: RcsColors.danger },
-  noRecord: { padding: 20, borderRadius: 14, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
+  noRecord: { padding: 20, borderRadius: 4, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
   noRecordTitle: { color: RcsColors.brownDark, fontSize: 14, fontWeight: '800' },
   noRecordCopy: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 12, lineHeight: 18 },
   });

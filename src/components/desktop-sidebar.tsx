@@ -3,9 +3,10 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
-import { useAppTheme } from '@/contexts/theme-context';
 import { useAuth } from '@/contexts/auth-context';
+import { useAppTheme } from '@/contexts/theme-context';
 
 type Route =
   | '/home'
@@ -15,7 +16,7 @@ type Route =
   | '/applications'
   | '/ticket'
   | '/help'
-  | '/other-urls'
+/*  | '/other-urls' */
   | '/portal'
   | {
       pathname: '/records/[section]';
@@ -112,6 +113,7 @@ export function DesktopSidebar({
   const router = useRouter();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(initialExpandedGroups);
   const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
+  const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
 
   const navigate = (route: Route) => {
     router.replace(route);
@@ -166,7 +168,7 @@ export function DesktopSidebar({
     <View style={[styles.sidebar, fullScreen && styles.fullScreenSidebar]}>
       <View style={styles.sidebarHeader}>
         <View>
-          <Text style={styles.sidebarEyebrow}>RCS EMPLOYEE</Text>
+          <Text style={styles.sidebarEyebrow} numberOfLines={1}>{companyBranding.name.toUpperCase()}</Text>
           <Text style={styles.sidebarTitle}>Navigation</Text>
         </View>
         {fullScreen && onClose ? (
@@ -225,7 +227,7 @@ export function DesktopSidebar({
 
         <Text style={[styles.sectionLabel, styles.recordsLabel]}>OTHER</Text>
         {renderLink({ label: 'Submit a ticket', route: '/ticket' }, true)}
-        {renderLink({ label: 'Other URLs', route: '/other-urls' }, true)}
+        {/*renderLink({ label: 'Other URLs', route: '/other-urls' }, true)*/}
         {renderLink({ label: 'Help', route: '/help' }, true)}
         {renderLink({ label: 'Legacy Employee Portal', route: '/portal' }, true)}
       </ScrollView>
@@ -233,7 +235,7 @@ export function DesktopSidebar({
       <View style={styles.versionFooter}>
         <View style={styles.accountSummary}>
           <Text style={styles.accountName} numberOfLines={1}>{user?.displayName || 'Employee'}</Text>
-          <Text style={styles.version} numberOfLines={1}>{user?.company.name}</Text>
+          <Text style={styles.version} numberOfLines={1}>{companyBranding.name}</Text>
         </View>
         <Pressable accessibilityRole="button" onPress={async () => { await signOut(); router.replace('/'); }} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressedLink]}>
           <Text style={styles.signOutText}>Sign out</Text>
@@ -258,7 +260,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
   },
   fullScreenSidebar: { width: '100%', maxWidth: '100%', borderRightWidth: 0 },
   sidebarHeader: {
-    minHeight: 102,
+    height: 84,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -273,13 +275,13 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     fontWeight: '800',
     letterSpacing: 1.2,
   },
-  sidebarTitle: { marginTop: 5, color: colors.brownDark, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
+  sidebarTitle: { marginTop: 5, color: colors.text, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
   closeButton: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 4,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -303,7 +305,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     marginBottom: 4,
-    borderRadius: 7,
+    borderRadius: 4,
   },
   primaryLinkText: { color: colors.grayDark, fontSize: 13, fontWeight: '600' },
   group: { marginBottom: 4 },
@@ -313,7 +315,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: 4,
   },
   groupLabel: {
     flex: 1,
@@ -339,8 +341,8 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     paddingRight: 12,
   },
   childLinkText: { flex: 1, color: colors.grayMuted, fontSize: 12, lineHeight: 17 },
-  activeLink: { backgroundColor: colors.brown },
-  activeLinkText: { color: colors.white, fontWeight: '800' },
+  activeLink: { backgroundColor: colors.yellowLight },
+  activeLinkText: { color: colors.brownDark, fontWeight: '700' },
   hoveredLink: { backgroundColor: colors.grayLight },
   pressedLink: { opacity: 0.75 },
   disabledLinkText: { color: '#A8A39A' },
@@ -348,7 +350,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     marginLeft: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 3,
     overflow: 'hidden',
     backgroundColor: colors.grayLight,
     color: colors.grayMuted,
@@ -368,7 +370,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
   },
   accountSummary: { flex: 1, minWidth: 0, gap: 3 },
   accountName: { color: colors.brownDark, fontSize: 11, fontWeight: '800' },
-  signOutButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.yellowLight },
+  signOutButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 4, backgroundColor: colors.yellowLight },
   signOutText: { color: colors.brown, fontSize: 11, fontWeight: '800' },
   version: { color: colors.grayMuted, fontSize: 10, lineHeight: 15, fontWeight: '600' },
   });

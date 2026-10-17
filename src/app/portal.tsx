@@ -111,7 +111,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderBottomColor: RcsColors.border,
   },
   title: { color: RcsColors.brownDark, fontSize: 17, fontWeight: '700' },
-  reloadButton: { paddingHorizontal: 10, paddingVertical: 8 },
+  reloadButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 },
   reloadText: { color: RcsColors.brownLight, fontSize: 14, fontWeight: '600' },
   warning: {
     paddingHorizontal: 16,

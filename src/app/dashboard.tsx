@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { ChoicePicker, EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
+import { ChoicePicker, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
+import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 
 const statusOptions = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
 const transactionCategories = [
@@ -21,11 +22,17 @@ const transactionCategories = [
 
 export default function DashboardScreen() {
   const { styles } = useDashboardStyles();
+  const { applications } = useDemoSubmissions();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [status, setStatus] = useState(statusOptions[0]);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const rows = applications.filter((item) =>
+    (status === 'All statuses' || item.status === status) &&
+    (!from || item.submittedAt >= from) && (!to || item.submittedAt <= to)
+  );
+  const pendingCount = applications.filter((item) => item.status === 'Pending').length;
 
   return (
     <PortalPage>
@@ -33,10 +40,7 @@ export default function DashboardScreen() {
         title="Dashboard"
         description="A clear overview of requests and their current status."
       />
-      <PreviewNotice>
-        Pending counts and application trends require live, authorized employee records. No
-        employee-specific totals are shown in this preview.
-      </PreviewNotice>
+      <PreviewNotice>Fictional request activity for presentation only. These examples do not represent live employee records.</PreviewNotice>
 
       <View style={styles.filters}>
         <DateField label="From" value={from} onChangeText={setFrom} />
@@ -52,14 +56,15 @@ export default function DashboardScreen() {
       </View>
 
       <View style={[styles.contentColumns, isDesktop && styles.desktopContentColumns]}>
-        <View style={styles.summaryCard}>
+        <View style={[styles.summaryCard, isDesktop && styles.desktopSummaryCard]}>
             <Text style={styles.summaryEyebrow}>REQUEST OVERVIEW</Text>
             <Text style={styles.summaryTitle}>Pending applications</Text>
-            <Text style={styles.summaryValue}>—</Text>
-            <Text style={styles.summaryNote}>Connect an approved data source to view totals.</Text>
+            <Text style={styles.summaryValue}>{pendingCount}</Text>
+            <Text style={styles.summaryNote}>Sample requests awaiting review</Text>
+            <Text style={styles.summaryNote}>{applications.length} sample requests in total</Text>
         </View>
 
-        <View style={styles.categoriesCard}>
+        <View style={[styles.categoriesCard, isDesktop && styles.desktopCategoriesCard]}>
             <Text style={styles.cardTitle}>Applications by transaction</Text>
             <Text style={styles.cardDescription}>
               Filtered by {status.toLowerCase()}{from || to ? ` · ${from || 'any date'} to ${to || 'today'}` : ''}
@@ -69,18 +74,23 @@ export default function DashboardScreen() {
                 <View key={category} style={styles.categoryRow}>
                   <View style={styles.categoryDot} />
                   <Text style={styles.categoryName}>{category}</Text>
-                  <Text style={styles.categoryValue}>—</Text>
+                  <Text style={styles.categoryValue}>{rows.filter((item) => categoryMatches(category, item.type)).length}</Text>
                 </View>
               ))}
             </View>
-            <EmptyState
-              title="Request data not connected"
-              description="Application counts and charts will appear here once the app has a secure connection to the employee system."
-            />
+            <Text style={styles.cardDescription}>{rows.length} requests match the current filters.</Text>
         </View>
       </View>
     </PortalPage>
   );
+}
+
+function categoryMatches(category: string, type: string) {
+  const normalized = category.toLowerCase();
+  const value = type.toLowerCase();
+  if (normalized === 'profile update') return value === 'profile';
+  if (normalized === 'rest day') return value === 'rest day';
+  return normalized === value || normalized === `${value} transactions`;
 }
 
 function DateField({
@@ -142,18 +152,17 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   },
   statusFilter: { flexGrow: 1, flexBasis: 230 },
   summaryCard: {
-    flex: 1,
     minWidth: 0,
     padding: 24,
     borderRadius: 16,
     backgroundColor: RcsColors.brownSurface,
   },
+  desktopSummaryCard: { flex: 1 },
   summaryEyebrow: { color: RcsColors.yellow, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   summaryTitle: { marginTop: 10, color: RcsColors.white, fontSize: 18, fontWeight: '700' },
   summaryValue: { marginTop: 4, color: RcsColors.white, fontSize: 42, fontWeight: '800' },
   summaryNote: { color: '#E4D9C9', fontSize: 12 },
   categoriesCard: {
-    flex: 1.25,
     minWidth: 0,
     padding: 22,
     borderRadius: 16,
@@ -161,6 +170,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
+  desktopCategoriesCard: { flex: 1.25 },
   cardTitle: { color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
   cardDescription: { marginTop: 5, color: RcsColors.grayMuted, fontSize: 12 },
   categoryList: { marginVertical: 17 },

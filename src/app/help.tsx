@@ -8,9 +8,9 @@ import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 
 const resources = [
-  { title: 'PAG-IBIG FAQ', type: 'Frequently asked questions' },
-  { title: 'User Manual', type: 'Employee Online System guide' },
-  { title: 'Sickness · EC · Insurance', type: 'Frequently asked questions' },
+  { title: 'PAG-IBIG FAQ', type: 'Frequently asked questions', content: 'Demo guidance: confirm your member information before making a request. Keep your membership number private and contact HR through approved channels if your record needs an update.' },
+  { title: 'User Manual', type: 'Employee Online System guide', content: 'Demo quick start: sign in with your employee account, use the navigation menu to open a service, and review sample request details before continuing. This prototype does not submit or save forms.' },
+  { title: 'Sickness · EC · Insurance', type: 'Frequently asked questions', content: 'Demo guidance: prepare the supporting documents requested for your case and check with HR for current eligibility, deadlines, and filing instructions. This sample page is not an active policy.' },
   { title: 'Employee Online Application Guide', type: 'Application instructions' },
 ];
 
@@ -28,7 +28,7 @@ export default function HelpScreen() {
         `${item.title} ${item.type} ${
           item.title === 'Employee Online Application Guide'
             ? applicationGuide.map((section) => `${section.title} ${section.steps.join(' ')}`).join(' ')
-            : ''
+            : 'content' in item ? item.content : ''
         }`
           .toLowerCase()
           .includes(query.trim().toLowerCase())
@@ -41,7 +41,7 @@ export default function HelpScreen() {
       <PageHeading title="Help" description="Search employee FAQs, guides, and system instructions." />
       <PreviewNotice>
         The application instructions below are adapted from the legacy Employee Online Application
-        Guide. Other FAQs and the User Manual still need their source content.
+        Guide. Other entries are fictional sample articles for presentation. Confirm real policies with HR.
       </PreviewNotice>
 
       <TextInput
@@ -77,9 +77,7 @@ export default function HelpScreen() {
                   <ApplicationGuideContent />
                 </View>
               ) : (
-                <Text style={styles.resourceUnavailable}>
-                  Official article content will be available when the help library is connected.
-                </Text>
+                <Text style={styles.resourceUnavailable}>{'content' in resource ? resource.content : ''}</Text>
               )
             ) : null}
           </Pressable>
@@ -111,7 +109,6 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   resourceList: { gap: 10 },
   desktopResourceList: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   resource: {
-    flexGrow: 1,
     minWidth: 0,
     minHeight: 76,
     flexDirection: 'row',
@@ -124,8 +121,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
-  desktopResource: { flexGrow: 0, flexBasis: '48%', minWidth: 280 },
-  resourceCopy: { flex: 1 },
+  desktopResource: { flexGrow: 1, flexBasis: '48%', minWidth: 280 },
+  resourceCopy: { flex: 1, minWidth: 0 },
   resourceType: { color: RcsColors.grayMuted, fontSize: 10, fontWeight: '700' },
   resourceTitle: { marginTop: 4, color: RcsColors.brownDark, fontSize: 15, fontWeight: '700' },
   resourceArrow: { marginLeft: 12, color: RcsColors.brownLight, fontSize: 22 },

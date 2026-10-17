@@ -5,16 +5,22 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
+import { useAuth } from '@/contexts/auth-context';
 
 type Route =
-  | '/'
+  | '/home'
   | '/dashboard'
   | '/announcements'
   | '/attendance'
   | '/applications'
+  | '/ticket'
   | '/help'
   | '/other-urls'
   | '/portal'
+  | {
+      pathname: '/records/[section]';
+      params: { section: string };
+    }
   | {
       pathname: '/inquiry/[section]';
       params: {
@@ -94,12 +100,6 @@ const menuGroups: MenuGroup[] = [
 ];
 
 const initialExpandedGroups: string[] = [];
-const today = new Date();
-const formattedToday = [
-  String(today.getMonth() + 1).padStart(2, '0'),
-  String(today.getDate()).padStart(2, '0'),
-  today.getFullYear(),
-].join('.');
 
 export function DesktopSidebar({
   onNavigate,
@@ -107,6 +107,7 @@ export function DesktopSidebar({
   onClose,
 }: DesktopSidebarProps) {
   const { colorScheme } = useAppTheme();
+  const { signOut, user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [expandedGroups, setExpandedGroups] = useState<string[]>(initialExpandedGroups);
@@ -128,8 +129,10 @@ export function DesktopSidebar({
     const active =
       typeof route === 'string'
         ? route === pathname
-        : route?.pathname === '/inquiry/[section]' &&
-          pathname === `/inquiry/${route.params.section}`;
+        : route?.pathname === '/inquiry/[section]'
+          ? pathname === `/inquiry/${route.params.section}`
+          : route?.pathname === '/records/[section]' &&
+            pathname === `/records/${route.params.section}`;
 
     return (
       <Pressable
@@ -180,6 +183,7 @@ export function DesktopSidebar({
 
       <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuContent}>
         <Text style={styles.sectionLabel}>WORKSPACE</Text>
+        {renderLink({ label: 'Home', route: '/home' }, true)}
         {renderLink({ label: 'Announcement', route: '/announcements' }, true)}
         {renderLink({ label: 'Dashboard', route: '/dashboard' }, true)}
         {renderLink({ label: 'Attendance & DTR', route: '/attendance' }, true)}
@@ -205,7 +209,14 @@ export function DesktopSidebar({
               </Pressable>
               {expanded ? (
                 <View style={styles.groupItems}>
-                  {group.links.map((link) => renderLink(link))}
+              {group.links.map((link) =>
+                renderLink({
+                  ...link,
+                  route:
+                    link.route ??
+                    ({ pathname: '/records/[section]', params: { section: toSectionKey(link.label) } } as const),
+                })
+              )}
                 </View>
               ) : null}
             </View>
@@ -213,19 +224,27 @@ export function DesktopSidebar({
         })}
 
         <Text style={[styles.sectionLabel, styles.recordsLabel]}>OTHER</Text>
+        {renderLink({ label: 'Submit a ticket', route: '/ticket' }, true)}
         {renderLink({ label: 'Other URLs', route: '/other-urls' }, true)}
         {renderLink({ label: 'Help', route: '/help' }, true)}
         {renderLink({ label: 'Legacy Employee Portal', route: '/portal' }, true)}
       </ScrollView>
 
       <View style={styles.versionFooter}>
-        <View style={styles.phaseBadge}>
-          <Text style={styles.phaseBadgeText}>PHASE 1</Text>
+        <View style={styles.accountSummary}>
+          <Text style={styles.accountName} numberOfLines={1}>{user?.displayName || 'Employee'}</Text>
+          <Text style={styles.version} numberOfLines={1}>{user?.company.name}</Text>
         </View>
-        <Text style={styles.version}>Prototype · 10.09.2026</Text> 
+        <Pressable accessibilityRole="button" onPress={async () => { await signOut(); router.replace('/'); }} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressedLink]}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable> 
       </View>
     </View>
   );
+}
+
+function toSectionKey(label: string) {
+  return label.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
@@ -239,7 +258,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
   },
   fullScreenSidebar: { width: '100%', maxWidth: '100%', borderRightWidth: 0 },
   sidebarHeader: {
-    minHeight: 94,
+    minHeight: 102,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -254,10 +273,10 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     fontWeight: '800',
     letterSpacing: 1.2,
   },
-  sidebarTitle: { marginTop: 5, color: colors.brownDark, fontSize: 18, fontWeight: '800' },
+  sidebarTitle: { marginTop: 5, color: colors.brownDark, fontFamily: 'Georgia', fontSize: 21, fontWeight: '700' },
   closeButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
@@ -284,7 +303,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     marginBottom: 4,
-    borderRadius: 10,
+    borderRadius: 7,
   },
   primaryLinkText: { color: colors.grayDark, fontSize: 13, fontWeight: '600' },
   group: { marginBottom: 4 },
@@ -312,7 +331,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     borderLeftColor: colors.border,
   },
   childLink: {
-    minHeight: 34,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -320,8 +339,8 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     paddingRight: 12,
   },
   childLinkText: { flex: 1, color: colors.grayMuted, fontSize: 12, lineHeight: 17 },
-  activeLink: { backgroundColor: colors.yellowLight },
-  activeLinkText: { color: colors.brownDark, fontWeight: '800' },
+  activeLink: { backgroundColor: colors.brown },
+  activeLinkText: { color: colors.white, fontWeight: '800' },
   hoveredLink: { backgroundColor: colors.grayLight },
   pressedLink: { opacity: 0.75 },
   disabledLinkText: { color: '#A8A39A' },
@@ -337,17 +356,20 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     fontWeight: '700',
   },
   versionFooter: {
-    minHeight: 76,
+    minHeight: 82,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 16,
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  phaseBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.yellowLight },
-  phaseBadgeText: { color: colors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  accountSummary: { flex: 1, minWidth: 0, gap: 3 },
+  accountName: { color: colors.brownDark, fontSize: 11, fontWeight: '800' },
+  signOutButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.yellowLight },
+  signOutText: { color: colors.brown, fontSize: 11, fontWeight: '800' },
   version: { color: colors.grayMuted, fontSize: 10, lineHeight: 15, fontWeight: '600' },
   });
 }

@@ -1,19 +1,12 @@
 import { Link } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Animated,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { useMemo } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
+import { demoAnnouncements, formatDemoDate } from '@/data/demo-data';
 
 export default function AnnouncementsScreen() {
   const { colorScheme } = useAppTheme();
@@ -21,130 +14,49 @@ export default function AnnouncementsScreen() {
   const styles = useMemo(() => createStyles(palette), [palette]);
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
-  const [tickerOffset] = useState(() => new Animated.Value(0));
-  const [tickerCopyWidth, setTickerCopyWidth] = useState(0);
-  const tickerMessage = 'Company announcements and memorandums will appear here when available.';
-
-  useEffect(() => {
-    if (tickerCopyWidth <= 0) return;
-    tickerOffset.setValue(0);
-    const distance = tickerCopyWidth + 32;
-    const animation = Animated.loop(
-      Animated.timing(tickerOffset, {
-        toValue: -distance,
-        duration: Math.max(9000, distance * 30),
-        useNativeDriver: true,
-      })
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [tickerCopyWidth, tickerOffset]);
+  const isCompact = width < 380;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <ScrollView contentContainerStyle={[styles.content, isDesktop && styles.desktopContent]}>
-        <Link href="/" asChild>
-          <Pressable accessibilityRole="button" style={styles.backButton}>
-            <Text style={styles.backButtonText}>‹  Home</Text>
-          </Pressable>
-        </Link>
-
-        <Text style={styles.eyebrow}>STAY IN THE LOOP</Text>
+      <ScrollView contentContainerStyle={[styles.content, width < 600 && styles.mobileContent, isCompact && styles.compactContent, isDesktop && styles.desktopContent]}>
+        <Link href="/home" asChild><Pressable accessibilityRole="button" style={styles.backButton}><Text style={styles.backButtonText}>‹ Home</Text></Pressable></Link>
+        <Text style={styles.eyebrow}>STAY IN THE LOOP · DEMO FEED</Text>
         <Text style={styles.title}>Announcements</Text>
-        <Text style={styles.subtitle}>Company announcements and memorandums.</Text>
-
-        <View
-          accessible
-          accessibilityLabel={tickerMessage}
-          accessibilityRole="text"
-          style={styles.ticker}
-        >
-          <Animated.View style={[styles.tickerTrack, { transform: [{ translateX: tickerOffset }] }]}>
-            {Array.from({ length: 5 }, (_, index) => (
-              <Text
-                key={index}
-                numberOfLines={1}
-                onLayout={
-                  index === 0
-                    ? (event) => setTickerCopyWidth(event.nativeEvent.layout.width)
-                    : undefined
-                }
-                style={[styles.tickerText, colorScheme === 'dark' && styles.darkTickerText]}
-              >
-                {tickerMessage}
-              </Text>
-            ))}
-          </Animated.View>
-        </View>
-
-        <View style={styles.announcementList}>
-          <Text style={styles.listTitle}>Announcements &amp; memorandums</Text>
-          <View style={styles.listRow}>
-            <View style={styles.listBullet} />
-            <View style={styles.listCopy}>
-              <Text style={styles.emptyTitle}>No announcements yet</Text>
-              <Text style={styles.emptyDescription}>
-                New company updates will appear in this list when the official feed is connected.
-              </Text>
-            </View>
-          </View>
+        <Text style={styles.subtitle}>Sample employee updates for a presentation walkthrough.</Text>
+        <View style={[styles.list, isDesktop && styles.desktopList]}>
+          {demoAnnouncements.map((item) => <View key={item.id} style={[styles.card, isDesktop && styles.desktopCard]}>
+            <View style={styles.cardTop}><Text style={styles.category}>{item.category}</Text><Text style={styles.date}>{formatDemoDate(item.date)}</Text></View>
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.body}>{item.body}</Text>
+            <Text style={styles.sampleId}>{item.id} · fictional sample notice</Text>
+          </View>)}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
+function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: RcsColors.background },
-  content: { width: '100%', maxWidth: 620, alignSelf: 'center', padding: 24, paddingBottom: 36 },
-  desktopContent: { maxWidth: 1180, padding: 32, paddingBottom: 40 },
-  backButton: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 26 },
-  backButtonText: { color: RcsColors.brownLight, fontSize: 14, fontWeight: '700' },
-  eyebrow: { color: RcsColors.brownLight, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  title: { marginTop: 8, color: RcsColors.brownDark, fontSize: 30, lineHeight: 36, fontWeight: '800' },
-  subtitle: { marginTop: 8, marginBottom: 18, color: RcsColors.gray, fontSize: 15, lineHeight: 22 },
-  ticker: {
-    height: 44,
-    justifyContent: 'center',
-    marginBottom: 16,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: RcsColors.brownSurface,
-  },
-  tickerTrack: { alignSelf: 'flex-start', flexDirection: 'row' },
-  tickerText: {
-    marginRight: 32,
-    color: RcsColors.yellowLight,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  darkTickerText: { color: RcsColors.text },
-  announcementList: {
-    padding: 17,
-    borderRadius: 14,
-    backgroundColor: RcsColors.surface,
-    borderWidth: 1,
-    borderColor: RcsColors.border,
-  },
-  listTitle: { marginBottom: 4, color: RcsColors.brownDark, fontSize: 15, fontWeight: '800' },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: RcsColors.border,
-  },
-  listBullet: {
-    width: 8,
-    height: 8,
-    marginTop: 5,
-    marginRight: 11,
-    borderRadius: 4,
-    backgroundColor: RcsColors.yellow,
-  },
-  listCopy: { flex: 1 },
-  emptyTitle: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
-  emptyDescription: { marginTop: 4, color: RcsColors.gray, fontSize: 12, lineHeight: 18 },
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    content: { width: '100%', maxWidth: 720, alignSelf: 'center', padding: 24, paddingBottom: 36 },
+    mobileContent: { padding: 18, paddingBottom: 30 },
+    compactContent: { padding: 14, paddingBottom: 26 },
+    desktopContent: { maxWidth: 1180, padding: 32, paddingBottom: 40 },
+    backButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 12, marginBottom: 26 },
+    backButtonText: { color: colors.brownLight, fontSize: 14, fontWeight: '700' },
+    eyebrow: { color: colors.brownLight, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+    title: { marginTop: 8, color: colors.brownDark, fontSize: 30, lineHeight: 36, fontWeight: '800' },
+    subtitle: { marginTop: 8, marginBottom: 18, color: colors.gray, fontSize: 15, lineHeight: 22 },
+    list: { gap: 12 },
+    desktopList: { flexDirection: 'row', flexWrap: 'wrap' },
+    card: { padding: 18, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderTopWidth: 3, borderTopColor: colors.yellow },
+    desktopCard: { flexGrow: 1, flexBasis: '48%' },
+    cardTop: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+    category: { flexShrink: 1, color: colors.brown, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+    date: { flexShrink: 0, color: colors.grayMuted, fontSize: 11 },
+    cardTitle: { marginTop: 11, color: colors.brownDark, fontSize: 17, fontWeight: '800' },
+    body: { marginTop: 7, color: colors.grayDark, fontSize: 13, lineHeight: 20 },
+    sampleId: { marginTop: 14, color: colors.grayMuted, fontSize: 10 },
   });
 }

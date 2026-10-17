@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
@@ -14,10 +14,12 @@ export function PortalPage({
   maxWidth?: number;
 }) {
   const styles = usePortalStyles();
+  const { width } = useWindowDimensions();
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <ScrollView
-        contentContainerStyle={[styles.page, { maxWidth }]}
+        contentContainerStyle={[styles.page, width < 600 && styles.mobilePage, width < 380 && styles.compactPage, { maxWidth }]}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {children}
@@ -49,7 +51,7 @@ export function PreviewNotice({ children }: { children: ReactNode }) {
   const styles = usePortalStyles();
   return (
     <View style={styles.notice}>
-      <Text style={styles.noticeTitle}>Not connected to employee records</Text>
+      <Text style={styles.noticeTitle}>Demo preview</Text>
       <Text style={styles.noticeText}>{children}</Text>
     </View>
   );
@@ -151,14 +153,19 @@ export function PortalCalendar({
   onSelectDate,
   onChangeMonth,
   onGoToday,
+  markedDates = [],
 }: {
   month: Date;
   selectedDate: Date | null;
   onSelectDate: (date: Date) => void;
   onChangeMonth: (amount: number, clearSelection?: boolean) => void;
   onGoToday: () => void;
+  markedDates?: string[];
 }) {
   const styles = usePortalStyles();
+  const { width } = useWindowDimensions();
+  const compact = width < 600;
+  const veryCompact = width < 380;
   const [view, setView] = useState<'days' | 'months' | 'years' | 'decades'>('days');
   const [pickerYear, setPickerYear] = useState(month.getFullYear());
   const year = month.getFullYear();
@@ -193,13 +200,13 @@ export function PortalCalendar({
   };
 
   return (
-    <View style={styles.calendarCard}>
-      <View style={styles.calendarHeader}>
+    <View style={[styles.calendarCard, compact && styles.mobileCalendarCard, veryCompact && styles.compactCalendarCard]}>
+      <View style={[styles.calendarHeader, compact && styles.mobileCalendarHeader, veryCompact && styles.compactCalendarHeader]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Previous ${view === 'days' ? 'month' : view === 'months' ? 'year' : view === 'years' ? 'decade' : 'century'}`}
           onPress={() => changeRange(-1)}
-          style={styles.monthButton}
+          style={[styles.monthButton, compact && styles.mobileMonthButton, veryCompact && styles.compactMonthButton]}
         >
           <Text style={styles.monthButtonText}>‹</Text>
         </Pressable>
@@ -219,7 +226,7 @@ export function PortalCalendar({
                 } else setView('decades');
               }}
             >
-              <Text style={styles.monthTitle}>{heading}</Text>
+              <Text style={[styles.monthTitle, compact && styles.mobileMonthTitle, veryCompact && styles.compactMonthTitle]}>{heading}</Text>
               <Text style={styles.headingChevron}>⌄</Text>
             </Pressable>
           )}
@@ -228,7 +235,7 @@ export function PortalCalendar({
           accessibilityRole="button"
           accessibilityLabel={`Next ${view === 'days' ? 'month' : view === 'months' ? 'year' : view === 'years' ? 'decade' : 'century'}`}
           onPress={() => changeRange(1)}
-          style={styles.monthButton}
+          style={[styles.monthButton, compact && styles.mobileMonthButton, veryCompact && styles.compactMonthButton]}
         >
           <Text style={styles.monthButtonText}>›</Text>
         </Pressable>
@@ -239,7 +246,7 @@ export function PortalCalendar({
             setPickerYear(new Date().getFullYear());
             onGoToday();
           }}
-          style={styles.todayButton}
+          style={[styles.todayButton, compact && styles.mobileTodayButton, veryCompact && styles.compactTodayButton]}
         >
           <Text style={styles.todayButtonText}>Today</Text>
         </Pressable>
@@ -256,11 +263,12 @@ export function PortalCalendar({
               selectedDate?.getFullYear() === year &&
               selectedDate.getMonth() === monthIndex &&
               selectedDate.getDate() === day;
+            const marked = markedDates.includes(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
             return (
               <Pressable
                 key={`${year}-${monthIndex}-${day}`}
                 accessibilityRole="button"
-                accessibilityLabel={date.toLocaleDateString()}
+                accessibilityLabel={`${date.toLocaleDateString()}${marked ? ', has sample record' : ''}`}
                 accessibilityState={{ selected }}
                 onPress={() => {
                   onSelectDate(date);
@@ -269,6 +277,7 @@ export function PortalCalendar({
                 style={[styles.dayCell, selected && styles.selectedDay]}
               >
                 <Text style={[styles.dayText, selected && styles.selectedDayText]}>{day}</Text>
+                {marked ? <View style={[styles.markedDayDot, selected && styles.selectedMarkedDayDot]} /> : null}
               </Pressable>
             );
           })}
@@ -378,6 +387,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
   page: { width: '100%', alignSelf: 'center', padding: 28, paddingBottom: 48 },
+  mobilePage: { padding: 20, paddingBottom: 36 },
+  compactPage: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 26 },
   heading: { marginBottom: 24 },
   eyebrow: { color: RcsColors.brownLight, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   title: { marginTop: 6, color: RcsColors.brownDark, fontSize: 32, fontWeight: '800' },
@@ -451,7 +462,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderColor: RcsColors.border,
   },
   option: {
-    minHeight: 38,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -470,7 +481,11 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
+  mobileCalendarCard: { padding: 14, borderRadius: 13 },
+  compactCalendarCard: { padding: 9 },
   calendarHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  mobileCalendarHeader: { gap: 6, marginBottom: 14 },
+  compactCalendarHeader: { gap: 4, marginBottom: 12 },
   monthButton: {
     width: 40,
     height: 40,
@@ -480,11 +495,17 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     backgroundColor: RcsColors.yellowLight,
   },
   monthButtonText: { color: RcsColors.brown, fontSize: 26, lineHeight: 30 },
+  mobileMonthButton: { width: 40, height: 44, borderRadius: 9 },
+  compactMonthButton: { width: 38, height: 44 },
   monthHeading: { flex: 1 },
   headingButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   monthTitle: { color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
+  mobileMonthTitle: { fontSize: 14 },
+  compactMonthTitle: { fontSize: 12 },
   headingChevron: { color: RcsColors.brownLight, fontSize: 18 },
   todayButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 10, backgroundColor: RcsColors.grayLight },
+  mobileTodayButton: { minHeight: 44, paddingHorizontal: 8, paddingVertical: 9 },
+  compactTodayButton: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 8 },
   todayButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: `${100 / 7}%`, paddingVertical: 10, color: RcsColors.grayMuted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
@@ -494,6 +515,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   adjacentChoiceText: { color: RcsColors.grayMuted },
   selectedDay: { backgroundColor: RcsColors.brownSurface },
   dayText: { color: RcsColors.grayDark, fontSize: 13 },
+  markedDayDot: { width: 4, height: 4, marginTop: 2, borderRadius: 2, backgroundColor: RcsColors.brownLight },
+  selectedMarkedDayDot: { backgroundColor: RcsColors.yellow },
   selectedDayText: { color: RcsColors.white, fontWeight: '800' },
   });
 }

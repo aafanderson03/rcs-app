@@ -18,8 +18,11 @@ module.exports = function withPrototypeHttpPortal(config) {
       ...(typeof transportSecurity === 'object' && transportSecurity !== null
         ? transportSecurity
         : {}),
+      NSAllowsLocalNetworking: true,
       NSAllowsArbitraryLoadsInWebContent: true,
     };
+    config.modResults.NSLocalNetworkUsageDescription =
+      'RCS Employee uses your local network to reach the development sign-in service on your computer.';
     return config;
   });
 };

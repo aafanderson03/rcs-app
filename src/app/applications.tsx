@@ -13,6 +13,8 @@ import {
 } from '@/components/portal-ui';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
+import { formatDemoDate, relativeDate, type DemoApplication } from '@/data/demo-data';
+import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 
 const transactionTypes = [
   'Attendance',
@@ -26,7 +28,7 @@ const transactionTypes = [
   'Workshift',
 ];
 const typeFilters = ['All transaction types', ...transactionTypes];
-const statusFilters = ['Pending', 'Approved', 'Disapproved', 'Cancelled'];
+const statusFilters = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
 
 type RequestField = {
   key: string;
@@ -356,9 +358,11 @@ const requestForms: Record<string, RequestSection[]> = {
 };
 
 export default function ApplicationsScreen() {
-  const { colorScheme, styles } = useApplicationStyles();
+  const { colorScheme, palette, styles } = useApplicationStyles();
+  const { applications, cancelDemoApplication, submitDemoApplication } = useDemoSubmissions();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
+  const compactScreen = width < 380;
   const [selectedTransaction, setSelectedTransaction] = useState('');
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [openPagePicker, setOpenPagePicker] = useState<string | null>(null);
@@ -371,6 +375,24 @@ export default function ApplicationsScreen() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [lastSubmission, setLastSubmission] = useState<DemoApplication | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const filteredApplications = applications.filter((item) =>
+    (statusFilter === 'All statuses' || item.status === statusFilter) &&
+    (transactionFilter === 'All transaction types' || item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile')))
+  );
+  const markedDates = filteredApplications.map((item) => item.submittedAt);
+  const selectedDateKey = selectedDate ? [selectedDate.getFullYear(), String(selectedDate.getMonth() + 1).padStart(2, '0'), String(selectedDate.getDate()).padStart(2, '0')].join('-') : '';
+  const selectedApplications = filteredApplications.filter((item) => item.submittedAt === selectedDateKey);
+  const closeCancellation = () => {
+    setConfirmCancelId(null);
+    setCancelReason('');
+  };
+  const confirmCancellation = (applicationId: string) => {
+    if (!cancelReason.trim()) return;
+    if (cancelDemoApplication(applicationId, cancelReason)) closeCancellation();
+  };
 
   const continueToRequest = () => {
     if (!selectedTransaction) {
@@ -387,6 +409,10 @@ export default function ApplicationsScreen() {
         key={selectedTransaction}
         transaction={selectedTransaction}
         onBack={() => setShowRequestForm(false)}
+        onSubmit={(transaction, values) => {
+          setLastSubmission(submitDemoApplication(transaction, values));
+          setShowRequestForm(false);
+        }}
       />
     );
   }
@@ -397,7 +423,7 @@ export default function ApplicationsScreen() {
       edges={['bottom']}
     >
       <ScrollView
-        contentContainerStyle={[styles.content, isDesktop && styles.desktopContent]}
+        contentContainerStyle={[styles.content, width < 600 && styles.mobileContent, compactScreen && styles.compactContent, isDesktop && styles.desktopContent]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heading}>
@@ -408,8 +434,11 @@ export default function ApplicationsScreen() {
           </Text>
         </View>
 
+        <PreviewNotice>All records are fictional presentation data. Forms can be submitted to local demo history only; no live employee system is contacted.</PreviewNotice>
+        {lastSubmission ? <View style={styles.receiptCard}><Text style={styles.receiptTitle}>Demo request submitted</Text><Text style={styles.applicationSummary}>{lastSubmission.summary}</Text><Text style={styles.applicationMeta}>Receipt {lastSubmission.id} · Added to this device&apos;s demo history</Text></View> : null}
+
         <View style={[styles.contentColumns, isDesktop && styles.desktopContentColumns]}>
-          <View style={[styles.startCard, openPagePicker === 'start-transaction' && styles.openPickerCard]}>
+          <View style={[styles.startCard, isDesktop && styles.desktopStartCard, openPagePicker === 'start-transaction' && styles.openPickerCard]}>
             <View style={styles.cardHeading}>
               <View style={styles.cardNumber}>
                 <Text style={styles.cardNumberText}>1</Text>
@@ -420,7 +449,7 @@ export default function ApplicationsScreen() {
               </View>
             </View>
 
-            <View style={styles.startRow}>
+            <View style={[styles.startRow, isDesktop && styles.desktopStartRow]}>
               <View style={styles.transactionPicker}>
                 <OptionPicker
                   label="Transaction type"
@@ -442,7 +471,7 @@ export default function ApplicationsScreen() {
                 onPress={continueToRequest}
                 style={({ pressed }) => [
                   styles.continueButton,
-                  isDesktop && styles.desktopContinueButton,
+                  isDesktop &&                   isDesktop && styles.desktopContinueButton,
                   !selectedTransaction && styles.continueButtonDisabled,
                   pressed && selectedTransaction && styles.pressed,
                 ]}
@@ -458,7 +487,7 @@ export default function ApplicationsScreen() {
             <View style={styles.listHeading}>
               <View style={styles.listHeadingCopy}>
                 <Text style={styles.listTitle}>Submitted applications</Text>
-                <Text style={styles.listSubtitle}>Filter these results below.</Text>
+                <Text style={styles.listSubtitle}>{filteredApplications.length} sample requests · filter below</Text>
               </View>
               <View style={styles.viewToggle}>
                 <Pressable
@@ -484,7 +513,7 @@ export default function ApplicationsScreen() {
               </View>
             </View>
 
-            <View style={styles.filters}>
+            <View style={[styles.filters, isDesktop && styles.desktopFilters]}>
               <View
                 style={[
                   styles.filterPicker,
@@ -518,10 +547,41 @@ export default function ApplicationsScreen() {
             </View>
 
             {view === 'list' ? (
-              <EmptyState
-                title="Applications will appear here"
-                description="Submitted request history and filters will be available when the employee system is connected."
-              />
+              <View style={styles.applicationList}>
+                {filteredApplications.length ? filteredApplications.map((item) => <View key={item.id} style={styles.applicationCard}>
+                  <View style={styles.applicationCardTop}><Text style={styles.applicationType}>{item.type}</Text><Text style={[styles.statusPill, item.status === 'Approved' && styles.approvedPill, item.status === 'Disapproved' && styles.disapprovedPill, item.status === 'Cancelled' && styles.cancelledPill]}>{item.status}</Text></View>
+                  <Text style={styles.applicationSummary}>{item.summary}</Text>
+                  <Text style={styles.applicationMeta}>{item.id} · Submitted {formatDemoDate(item.submittedAt, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                  {item.details?.slice(2, 5).map((detail) => <Text key={`${item.id}-${detail.label}`} style={styles.applicationMeta}>{detail.label}: {detail.value}</Text>)}
+                  {item.cancellationReason ? <Text style={styles.cancellationReason}>Cancellation reason: {item.cancellationReason}</Text> : null}
+                  {item.status === 'Pending' ? confirmCancelId === item.id ? (
+                    <View style={styles.cancelConfirmation}>
+                      <Text style={styles.cancelPrompt}>Why are you cancelling this request?</Text>
+                      <TextInput
+                        accessibilityLabel="Reason for cancelling this application"
+                        value={cancelReason}
+                        onChangeText={setCancelReason}
+                        placeholder="Enter a cancellation reason"
+                        placeholderTextColor={palette.grayMuted}
+                        multiline
+                        style={[styles.formInput, styles.cancelReasonInput]}
+                      />
+                      <View style={styles.cancelActions}>
+                        <Pressable accessibilityRole="button" onPress={closeCancellation} style={({ pressed }) => [styles.keepRequestButton, pressed && styles.pressed]}>
+                          <Text style={styles.keepRequestText}>Keep request</Text>
+                        </Pressable>
+                        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !cancelReason.trim() }} disabled={!cancelReason.trim()} onPress={() => confirmCancellation(item.id)} style={({ pressed }) => [styles.cancelRequestButton, !cancelReason.trim() && styles.cancelButtonDisabled, pressed && styles.pressed]}>
+                          <Text style={styles.cancelRequestText}>Confirm cancel</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Cancel pending ${item.type} request`} onPress={() => { setCancelReason(''); setConfirmCancelId(item.id); }} style={({ pressed }) => [styles.cancelLink, pressed && styles.pressed]}>
+                      <Text style={styles.cancelLinkText}>Cancel request</Text>
+                    </Pressable>
+                  ) : null}
+                </View>) : <EmptyState title="No matching sample requests" description="Change the transaction or status filters to see other demo entries." />}
+              </View>
             ) : (
               <View>
                 <PortalCalendar
@@ -537,10 +597,12 @@ export default function ApplicationsScreen() {
                     setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
                     setSelectedDate(today);
                   }}
+                  markedDates={markedDates}
                 />
                 <Text style={styles.calendarNote}>
-                  Request dates will appear here when application history is connected.
+                  {selectedDate ? `${selectedApplications.length} sample request${selectedApplications.length === 1 ? '' : 's'} on ${formatDemoDate(selectedDateKey)}.` : 'Marked days have sample request activity. Select a date to see its requests.'}
                 </Text>
+                {selectedApplications.map((item) => <View key={item.id} style={[styles.applicationCard, styles.calendarApplication]}><Text style={styles.applicationType}>{item.type} · {item.status}</Text><Text style={styles.applicationSummary}>{item.summary}</Text><Text style={styles.applicationMeta}>{item.id}</Text>{item.cancellationReason ? <Text style={styles.cancellationReason}>Cancellation reason: {item.cancellationReason}</Text> : null}{item.status === 'Pending' ? confirmCancelId === item.id ? <View style={styles.cancelConfirmation}><Text style={styles.cancelPrompt}>Why are you cancelling this request?</Text><TextInput accessibilityLabel="Reason for cancelling this application" value={cancelReason} onChangeText={setCancelReason} placeholder="Enter a cancellation reason" placeholderTextColor={palette.grayMuted} multiline style={[styles.formInput, styles.cancelReasonInput]} /><View style={styles.cancelActions}><Pressable accessibilityRole="button" onPress={closeCancellation} style={({ pressed }) => [styles.keepRequestButton, pressed && styles.pressed]}><Text style={styles.keepRequestText}>Keep request</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !cancelReason.trim() }} disabled={!cancelReason.trim()} onPress={() => confirmCancellation(item.id)} style={({ pressed }) => [styles.cancelRequestButton, !cancelReason.trim() && styles.cancelButtonDisabled, pressed && styles.pressed]}><Text style={styles.cancelRequestText}>Confirm cancel</Text></Pressable></View></View> : <Pressable accessibilityRole="button" accessibilityLabel={`Cancel pending ${item.type} request`} onPress={() => { setCancelReason(''); setConfirmCancelId(item.id); }} style={({ pressed }) => [styles.cancelLink, pressed && styles.pressed]}><Text style={styles.cancelLinkText}>Cancel request</Text></Pressable> : null}</View>)}
               </View>
             )}
           </View>
@@ -553,9 +615,11 @@ export default function ApplicationsScreen() {
 function RequestForm({
   transaction,
   onBack,
+  onSubmit,
 }: {
   transaction: string;
   onBack: () => void;
+  onSubmit: (transaction: string, values: Record<string, string>) => void;
 }) {
   const { palette, styles } = useApplicationStyles();
   const { width } = useWindowDimensions();
@@ -594,6 +658,15 @@ function RequestForm({
     setReviewing(true);
   };
 
+  const submitRequest = () => {
+    setShowErrors(true);
+    if (missingFields.length > 0) {
+      setReviewing(false);
+      return;
+    }
+    onSubmit(transaction, values);
+  };
+
   return (
     <PortalPage>
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.formBackButton}>
@@ -604,15 +677,23 @@ function RequestForm({
         description="Complete the request details below."
       />
       <PreviewNotice>
-        Request forms are a preview and are not connected to the employee system. Your entries stay
-        on this screen only; reviewing a request does not submit or save it.
+        Fictional demo only. Submitting adds a sample request to this device&apos;s local history; no live employee system is contacted.
       </PreviewNotice>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setValues(Object.fromEntries(allFields.map((field) => [field.key, sampleFieldValue(field)])))}
+        style={({ pressed }) => [styles.fillSampleButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.fillSampleButtonText}>Fill with sample data</Text>
+      </Pressable>
 
       {sections.map((section) => (
         <View
           key={section.title}
           style={[
             styles.formSection,
+            width < 600 && styles.mobileFormSection,
             section.repeatable && styles.repeatableSection,
             fieldsForSection(section).some((field) => field.key === openPickerField) &&
               styles.openFormSection,
@@ -727,7 +808,7 @@ function RequestForm({
         <View style={styles.reviewCard}>
           <Text style={styles.reviewTitle}>Request review</Text>
           <Text style={styles.reviewDescription}>
-            This preview contains your current entries only. Nothing has been sent or saved.
+            Check the details, then submit this fictional request to your local demo history.
           </Text>
           {allFields
             .filter((field) => values[field.key]?.trim())
@@ -742,7 +823,7 @@ function RequestForm({
         </View>
       ) : null}
 
-      <View style={styles.formActions}>
+      <View style={[styles.formActions, width < 380 && styles.compactFormActions]}>
         <Pressable
           accessibilityRole="button"
           onPress={() => {
@@ -755,10 +836,10 @@ function RequestForm({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={reviewRequest}
+          onPress={reviewing ? submitRequest : reviewRequest}
           style={({ pressed }) => [styles.primaryFormButton, pressed && styles.pressed]}
         >
-          <Text style={styles.primaryFormButtonText}>Review request</Text>
+          <Text style={styles.primaryFormButtonText}>{reviewing ? 'Submit demo request' : 'Review request'}</Text>
           <Text style={styles.continueArrow}>›</Text>
         </Pressable>
       </View>
@@ -939,6 +1020,18 @@ function placeholderFor(field: RequestField) {
   return `Enter ${field.label.toLowerCase()}`;
 }
 
+function sampleFieldValue(field: RequestField) {
+  if (field.type === 'checkbox') return '';
+  if (field.type === 'date') return relativeDate(0);
+  if (field.type === 'time') return '08:00';
+  if (field.type === 'number') return '1';
+  if (field.type === 'email') return 'demo.employee@example.test';
+  if ((field.type === 'select' || field.type === 'combo') && field.options?.length) return field.options[0];
+  if (field.type === 'textarea') return 'Sample entry for presentation';
+  if (/tin|sss|gsis|philhealth|pag.?ibig|account number/i.test(field.label)) return 'DEMO-****-1042';
+  return `Sample ${field.label.toLowerCase()}`;
+}
+
 function OptionPicker({
   label,
   value,
@@ -1018,6 +1111,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 24, paddingBottom: 40 },
+  mobileContent: { padding: 18, paddingBottom: 32 },
+  compactContent: { padding: 14, paddingBottom: 28 },
   desktopContent: { maxWidth: 1500, padding: 32, paddingBottom: 44 },
   heading: { marginBottom: 20 },
   eyebrow: { color: RcsColors.brownLight, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
@@ -1025,9 +1120,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   desktopTitle: { fontSize: 32 },
   subtitle: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 14, lineHeight: 21 },
   contentColumns: { gap: 18 },
-  desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 22 },
+  desktopContentColumns: { gap: 24 },
   startCard: {
-    flex: 0.9,
     minWidth: 0,
     zIndex: 1,
     elevation: 1,
@@ -1037,6 +1131,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
+  desktopStartCard: { width: '100%' },
   cardHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: 22 },
   cardNumber: {
     width: 38,
@@ -1087,7 +1182,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderColor: RcsColors.border,
   },
   option: {
-    minHeight: 42,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1108,28 +1203,54 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderRadius: 11,
     backgroundColor: RcsColors.brownSurface,
   },
-  desktopContinueButton: { width: '100%', marginTop: 12 },
+  desktopContinueButton: { minWidth: 150, marginTop: 0 },
   continueButtonDisabled: { opacity: 0.55 },
   continueButtonText: { color: RcsColors.white, fontSize: 14, fontWeight: '700' },
   continueArrow: { color: RcsColors.yellow, fontSize: 22, lineHeight: 25 },
   notice: { marginTop: 12, color: RcsColors.brown, fontSize: 12, lineHeight: 18 },
-  listSection: { flex: 1.1, minWidth: 0, marginTop: 32, zIndex: 2, elevation: 2 },
+  listSection: { minWidth: 0, marginTop: 32, zIndex: 2, elevation: 2 },
   listHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 17 },
   listHeadingCopy: { flex: 1, minWidth: 160 },
   listTitle: { color: RcsColors.brownDark, fontSize: 20, fontWeight: '800' },
   listSubtitle: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 12 },
   viewToggle: { flexDirection: 'row', gap: 4 },
-  viewToggleOption: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 8, backgroundColor: RcsColors.grayLight },
+  viewToggleOption: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 8, backgroundColor: RcsColors.grayLight },
   selectedView: { backgroundColor: RcsColors.brownSurface },
   viewToggleText: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
   selectedViewText: { color: RcsColors.white },
   filters: { gap: 12, marginBottom: 18, zIndex: 10, elevation: 10 },
+  desktopFilters: { flexDirection: 'row' },
   filterPicker: { flex: 1, minWidth: 0 },
   activeFilterPicker: { zIndex: 100, elevation: 100 },
   desktopListSection: { marginTop: 0 },
   calendarNote: { marginTop: 12, color: RcsColors.grayMuted, fontSize: 12 },
+  applicationList: { gap: 10 },
+  applicationCard: { padding: 15, borderRadius: 12, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
+  applicationCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  applicationType: { color: RcsColors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  statusPill: { overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 12, backgroundColor: RcsColors.yellowLight, color: RcsColors.brownDark, fontSize: 10, fontWeight: '800' },
+  approvedPill: { backgroundColor: '#DDEBDD', color: '#315A36' },
+  disapprovedPill: { backgroundColor: '#F3DFDA', color: '#8A3F32' },
+  cancelledPill: { backgroundColor: RcsColors.grayLight, color: RcsColors.grayDark },
+  applicationSummary: { marginTop: 9, color: RcsColors.brownDark, fontSize: 14, fontWeight: '700' },
+  applicationMeta: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 11 },
+  cancellationReason: { marginTop: 8, color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
+  cancelLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 10, borderRadius: 8, backgroundColor: RcsColors.grayLight },
+  cancelLinkText: { color: RcsColors.danger, fontSize: 12, fontWeight: '700' },
+  cancelConfirmation: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
+  cancelPrompt: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '700' },
+  cancelReasonInput: { minHeight: 72, marginTop: 8 },
+  cancelActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  keepRequestButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, backgroundColor: RcsColors.surface },
+  keepRequestText: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '700' },
+  cancelRequestButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, backgroundColor: RcsColors.danger },
+  cancelButtonDisabled: { opacity: 0.5 },
+  cancelRequestText: { color: RcsColors.white, fontSize: 12, fontWeight: '700' },
+  calendarApplication: { marginTop: 10 },
+  receiptCard: { padding: 16, marginBottom: 18, borderRadius: 12, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
+  receiptTitle: { color: RcsColors.brownDark, fontSize: 14, fontWeight: '800' },
   pressed: { opacity: 0.75 },
-  formBackButton: { alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 16 },
+  formBackButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 12, marginBottom: 16 },
   formBackText: { color: RcsColors.brownLight, fontSize: 14, fontWeight: '700' },
   formSection: {
     padding: 22,
@@ -1139,6 +1260,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
+  mobileFormSection: { padding: 16, borderRadius: 13 },
   repeatableSection: { zIndex: 1 },
   openFormSection: { zIndex: 100, elevation: 100 },
   addDependentButton: {
@@ -1230,8 +1352,11 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   },
   checkboxChecked: { backgroundColor: RcsColors.brownSurface, borderColor: RcsColors.brownSurface },
   checkboxMark: { color: RcsColors.white, fontSize: 13, fontWeight: '800' },
-  formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 4 },
+  formActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 12, marginTop: 4 },
+  compactFormActions: { justifyContent: 'flex-start' },
   secondaryFormButton: {
+    flexGrow: 1,
+    minWidth: 128,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1241,6 +1366,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   },
   secondaryFormButtonText: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
   primaryFormButton: {
+    flexGrow: 1,
+    minWidth: 128,
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1260,6 +1387,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.yellow,
   },
+  fillSampleButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, marginBottom: 16, borderRadius: 9, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.border },
+  fillSampleButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   reviewTitle: { color: RcsColors.brownDark, fontSize: 17, fontWeight: '800' },
   reviewDescription: { marginTop: 5, marginBottom: 12, color: RcsColors.grayDark, fontSize: 12 },
   reviewRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: RcsColors.border },

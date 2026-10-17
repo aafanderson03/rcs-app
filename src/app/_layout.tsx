@@ -1,4 +1,4 @@
-import { DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'expo-image';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -10,6 +10,8 @@ import { DesktopSidebar } from '@/components/desktop-sidebar';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme } from '@/constants/theme';
 import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch((error: unknown) => {
@@ -20,23 +22,30 @@ if (Platform.OS !== 'web') {
 export default function RootLayout() {
   return (
     <AppThemeProvider>
-      <RootLayoutContent />
+      <AuthProvider>
+        <DemoSubmissionsProvider>
+          <RootLayoutContent />
+        </DemoSubmissionsProvider>
+      </AuthProvider>
     </AppThemeProvider>
   );
 }
 
 function RootLayoutContent() {
   const { colorScheme, mode, setMode, storageError } = useAppTheme();
+  const { user } = useAuth();
   const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const router = useRouter();
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashProgress] = useState(() => new Animated.Value(0));
   const [splashOpacity] = useState(() => new Animated.Value(1));
   const isDesktop = Platform.OS === 'web' && width >= 960;
+  const isPublicPage = pathname === '/' || pathname === '/login' || !user;
   const theme = {
     ...DefaultTheme,
     colors: {
@@ -51,6 +60,14 @@ function RootLayoutContent() {
   };
 
   useEffect(() => {
+    if (!user && pathname !== '/' && pathname !== '/login') {
+      router.replace('/');
+    } else if (user && pathname.startsWith('/workspace/')) {
+      router.replace('/home');
+    }
+  }, [pathname, router, user]);
+
+  useEffect(() => {
     if (Platform.OS !== 'web') {
       SplashScreen.hideAsync().catch((error: unknown) => {
         console.error('Unable to hide the native splash screen.', error);
@@ -61,22 +78,20 @@ function RootLayoutContent() {
       toValue: 1,
       duration: 550,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     });
-    const splashAnimation = Animated.sequence([
-      Animated.delay(3000),
-      Animated.timing(splashOpacity, {
-        toValue: 0,
-        duration: 500,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
+    const splashAnimation = Animated.timing(splashOpacity, {
+      toValue: 0,
+      duration: 400,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    });
     artworkAnimation.start();
-    splashAnimation.start(({ finished }) => {
+    const splashTimer = setTimeout(() => splashAnimation.start(({ finished }) => {
       if (finished) setSplashVisible(false);
-    });
+    }), 550);
     return () => {
+      clearTimeout(splashTimer);
       artworkAnimation.stop();
       splashAnimation.stop();
     };
@@ -87,9 +102,9 @@ function RootLayoutContent() {
       <SafeAreaProvider>
         <SafeAreaView style={[styles.root, isDesktop && styles.desktopRoot]} edges={['top']}>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          {isDesktop && desktopSidebarVisible ? <DesktopSidebar /> : null}
+          {!isPublicPage && isDesktop && desktopSidebarVisible ? <DesktopSidebar /> : null}
           <View style={styles.mainColumn}>
-            <View style={[styles.topBar, isDesktop && styles.desktopTopBar]}>
+            {!isPublicPage ? <View style={[styles.topBar, isDesktop && styles.desktopTopBar]}>
               <View style={styles.brandGroup}>
                 <Pressable
                   accessibilityRole="button"
@@ -125,7 +140,7 @@ function RootLayoutContent() {
                   accessibilityLabel="Go to home"
                   onPress={() => {
                     setMenuOpen(false);
-                    router.replace('/');
+                    router.replace('/home');
                   }}
                   style={({ pressed }) => [styles.brand, pressed && styles.brandPressed]}
                 >
@@ -158,8 +173,8 @@ function RootLayoutContent() {
                   ) : null}
                 </Pressable>
               </View>
-            </View>
-            {storageError ? (
+            </View> : null}
+            {!isPublicPage && storageError ? (
               <View style={styles.storageErrorBanner} accessibilityLiveRegion="polite">
                 <Text style={styles.storageError}>{storageError}</Text>
               </View>
@@ -167,19 +182,24 @@ function RootLayoutContent() {
             <View style={styles.routeContainer}>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
+                <Stack.Screen name="home" />
+                <Stack.Screen name="workspace/[employeeType]" />
+                <Stack.Screen name="login" />
                 <Stack.Screen name="portal" />
                 <Stack.Screen name="announcements" />
                 <Stack.Screen name="attendance" />
                 <Stack.Screen name="applications" />
+                <Stack.Screen name="ticket" />
                 <Stack.Screen name="dashboard" />
                 <Stack.Screen name="dtr" />
                 <Stack.Screen name="help" />
                 <Stack.Screen name="other-urls" />
                 <Stack.Screen name="inquiry/[section]" />
+                <Stack.Screen name="records/[section]" />
               </Stack>
             </View>
           </View>
-          {!isDesktop && menuOpen ? (
+          {!isPublicPage && !isDesktop && menuOpen ? (
             <View style={styles.drawerLayer}>
               <DesktopSidebar
                 fullScreen
@@ -261,27 +281,27 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   brandSubtitle: { color: colors.grayMuted, fontSize: 12 },
   brandPressed: { opacity: 0.75 },
   menuButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: colors.yellowLight,
+    borderRadius: 8,
+    backgroundColor: colors.grayLight,
   },
   menuButtonPressed: { opacity: 0.7 },
   hamburger: { width: 19, gap: 4 },
   hamburgerLine: { height: 2, borderRadius: 2, backgroundColor: colors.brownDark },
   themeControl: { zIndex: 4 },
   themeButton: {
-    minWidth: 42,
-    height: 42,
+    minWidth: 44,
+    height: 44,
     paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    borderRadius: 12,
-    backgroundColor: colors.yellowLight,
+    borderRadius: 8,
+    backgroundColor: colors.grayLight,
   },
   themeButtonText: { color: colors.brownDark, fontSize: 14, fontWeight: '700' },
   storageErrorBanner: {

@@ -2,6 +2,7 @@
   "name": "rcs-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
     "@expo-google-fonts/montserrat": "^0.4.2",
     "@expo-google-fonts/questrial": "^0.4.1",
@@ -46,7 +47,7 @@
     "auth:dev": "node --env-file-if-exists=.env.local server/auth-server.mjs",
     "db:setup": "node --env-file-if-exists=.env.local server/setup-database.mjs",
     "db:import-accounts": "node --env-file-if-exists=server/.env.local server/import-sqlite-accounts.mjs",
-    "reset-project": "node ./scripts/reset-project.js",
+    "reset-project": "node ./scripts/reset-project.cjs",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

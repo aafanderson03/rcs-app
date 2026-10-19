@@ -73,6 +73,22 @@ function getAuthApiUrl() {
 
 const apiUrl = getAuthApiUrl();
 
+async function readApiJson(response: Response) {
+  const responseText = await response.text();
+  let data: { error?: string; token?: string; user?: AuthUser };
+
+  try {
+    data = JSON.parse(responseText) as typeof data;
+  } catch {
+    throw new Error(
+      `The server returned an unexpected response (HTTP ${response.status}). Check the Vercel function logs.`,
+    );
+  }
+
+  if (!response.ok) throw new Error(data.error || 'The request could not be completed.');
+  return data;
+}
+
 export function authApiEndpoint(path: string) {
   if (!apiUrl) throw new Error('Set EXPO_PUBLIC_AUTH_API_URL in the production app build.');
   return `${apiUrl}${path}`;
@@ -91,10 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Sign-in failed.');
-      setToken(data.token as string);
-      const authenticatedUser = data.user as AuthUser;
+      const data = await readApiJson(response);
+      if (!data.token || !data.user) throw new Error('The server response was missing login information.');
+      setToken(data.token);
+      const authenticatedUser = data.user;
       setUser(authenticatedUser);
       return authenticatedUser;
     },

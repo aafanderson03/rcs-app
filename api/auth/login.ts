@@ -1,5 +1,5 @@
-import { badRequest, endpoint, jsonResponse, readJson } from '../_lib/http';
-import { signIn } from '../_lib/auth';
+import { badRequest, endpoint, jsonResponse, readJson } from '../_lib/http.js';
+import { signIn } from '../_lib/auth.js';
 
 export const POST = endpoint(async (request) => {
   const body = await readJson(request);

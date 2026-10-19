@@ -1,5 +1,5 @@
-import { endpoint, jsonResponse } from './_lib/http';
-import { getAdminClient } from './_lib/supabase';
+import { endpoint, jsonResponse } from './_lib/http.js';
+import { getAdminClient } from './_lib/supabase.js';
 
 export const GET = endpoint(async (request) => {
   const { error } = await getAdminClient().from('companies').select('slug').limit(1);

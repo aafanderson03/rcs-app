@@ -1,5 +1,5 @@
-import { signOut } from '../_lib/auth';
-import { endpoint, jsonResponse } from '../_lib/http';
+import { signOut } from '../_lib/auth.js';
+import { endpoint, jsonResponse } from '../_lib/http.js';
 
 export const POST = endpoint(async (request) => {
   const authorization = request.headers.get('authorization') ?? '';

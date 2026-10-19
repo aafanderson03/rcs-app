@@ -1,5 +1,5 @@
-import { authenticateRequest } from '../_lib/auth';
-import { endpoint, jsonResponse } from '../_lib/http';
+import { authenticateRequest } from '../_lib/auth.js';
+import { endpoint, jsonResponse } from '../_lib/http.js';
 
 export const GET = endpoint(async (request) => {
   const authenticated = await authenticateRequest(request);

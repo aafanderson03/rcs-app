@@ -1,6 +1,6 @@
 import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 
-import { getAdminClient } from './supabase';
+import { getAdminClient } from './supabase.js';
 
 const scryptOptions = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 const sessionLifetimeMs = 8 * 60 * 60 * 1000;

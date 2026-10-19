@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 
-import { authenticateRequest } from '../_lib/auth';
-import { badRequest, endpoint, jsonResponse, readJson } from '../_lib/http';
-import { getAdminClient } from '../_lib/supabase';
+import { authenticateRequest } from '../_lib/auth.js';
+import { badRequest, endpoint, jsonResponse, readJson } from '../_lib/http.js';
+import { getAdminClient } from '../_lib/supabase.js';
 
 function toApplication(row: any) {
   return {

@@ -26,7 +26,7 @@
     },
     "plugins": [
       "expo-router",
-      "./plugins/with-prototype-http-portal",
+      "./plugins/with-prototype-http-portal.cjs",
       [
         "expo-splash-screen",
         {

@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_oehxRr41dlhvJIFUwebfnuEibGTH",
+      "name": "rcs-supabase",
+      "directory": ".",
+      "orgId": "team_m9OVehi2sr06pqdRukpl5mqP"
+    }
+  ]
+}

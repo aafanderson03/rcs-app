@@ -8,6 +8,9 @@ import { useAppTheme } from '@/contexts/theme-context';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 
 const statusOptions = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
+const trackedStatuses = ['Pending', 'Approved', 'Disapproved', 'Cancelled'] as const;
+type TrackedStatus = (typeof trackedStatuses)[number];
+
 const transactionCategories = [
   'Attendance',
   'DTR Update',
@@ -21,24 +24,39 @@ const transactionCategories = [
 ];
 
 export default function DashboardScreen() {
-  const { styles } = useDashboardStyles();
+  const { styles, statusColors } = useDashboardStyles();
   const { applications } = useDemoSubmissions();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const [status, setStatus] = useState(statusOptions[0]);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const rows = applications.filter((item) =>
-    (status === 'All statuses' || item.status === status) &&
-    (!from || item.submittedAt >= from) && (!to || item.submittedAt <= to)
+
+  // Date filter only: used for the stat tiles so they always show the full status picture.
+  const dateRows = applications.filter(
+    (item) => (!from || item.submittedAt >= from) && (!to || item.submittedAt <= to)
   );
-  const pendingCount = applications.filter((item) => item.status === 'Pending').length;
-  const categoryCounts = transactionCategories.map((category) => {
-    const categoryRows = rows.filter((item) => categoryMatches(category, item.type));
-    const pending = categoryRows.filter((item) => item.status === 'Pending').length;
-    return { category, pending, done: categoryRows.length - pending, total: categoryRows.length };
-  });
+  // Date + status filter: used for the chart.
+  const rows = dateRows.filter((item) => status === 'All statuses' || item.status === status);
+
+  const statusTotals = trackedStatuses.map((name) => ({
+    name,
+    count: dateRows.filter((item) => item.status === name).length,
+  }));
+
+  const categoryCounts = transactionCategories
+    .map((category) => {
+      const categoryRows = rows.filter((item) => categoryMatches(category, item.type));
+      const counts = {} as Record<TrackedStatus, number>;
+      trackedStatuses.forEach((name) => {
+        counts[name] = categoryRows.filter((item) => item.status === name).length;
+      });
+      return { category, counts, total: categoryRows.length };
+    })
+    .sort((a, b) => b.total - a.total || a.category.localeCompare(b.category));
+
   const maxCategoryCount = Math.max(1, ...categoryCounts.map((item) => item.total));
+  const dateSummary = from || to ? ` · ${from || 'any date'} to ${to || 'today'}` : '';
 
   return (
     <PortalPage>
@@ -98,25 +116,49 @@ export default function DashboardScreen() {
                 </View>
               ))}
             </View>
-            <Text style={styles.chartNote}>Done includes approved, disapproved, or cancelled.</Text>
+          ))}
         </View>
 
-        <View style={[styles.categoriesCard, isDesktop && styles.desktopCategoriesCard]}>
-            <Text style={styles.cardTitle}>Applications by transaction</Text>
-            <Text style={styles.cardDescription}>
-              Filtered by {status.toLowerCase()}{from || to ? ` · ${from || 'any date'} to ${to || 'today'}` : ''}
-            </Text>
-            <View style={styles.categoryList}>
-              {categoryCounts.map(({ category, total }) => (
-                <View key={category} style={styles.categoryRow}>
-                  <View style={styles.categoryDot} />
-                  <Text style={styles.categoryName}>{category}</Text>
-                  <Text style={styles.categoryValue}>{total}</Text>
+        {rows.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No requests match these filters</Text>
+            <Text style={styles.emptyText}>Widen the date range or choose All statuses.</Text>
+          </View>
+        ) : (
+          <View style={styles.chartCategoryList}>
+            {categoryCounts.map(({ category, counts, total }) => (
+              <View
+                key={category}
+                style={[styles.chartCategoryRow, total === 0 && styles.chartRowEmpty]}
+              >
+                <Text style={styles.chartCategoryName} numberOfLines={1}>{category}</Text>
+                <View
+                  accessible
+                  accessibilityLabel={`${category}: ${trackedStatuses
+                    .map((name) => `${counts[name]} ${name.toLowerCase()}`)
+                    .join(', ')}`}
+                  style={styles.categoryBarTrack}
+                >
+                  {total > 0 ? (
+                    <View
+                      style={[styles.categoryBarFill, { width: `${(total / maxCategoryCount) * 100}%` }]}
+                    >
+                      {trackedStatuses.map((name) =>
+                        counts[name] > 0 ? (
+                          <View
+                            key={name}
+                            style={{ flex: counts[name], backgroundColor: statusColors[name] }}
+                          />
+                        ) : null
+                      )}
+                    </View>
+                  ) : null}
                 </View>
-              ))}
-            </View>
-            <Text style={styles.cardDescription}>{rows.length} requests match the current filters.</Text>
-        </View>
+                <Text style={styles.chartValue}>{total}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </PortalPage>
   );
@@ -159,76 +201,107 @@ function useDashboardStyles() {
   const { colorScheme } = useAppTheme();
   const palette = getPaletteForScheme(colorScheme);
   const styles = useMemo(() => createStyles(palette), [palette]);
-  return { styles, palette };
+  // Pending and Approved reuse your theme colors. Disapproved uses a muted red and
+  // Cancelled uses your muted gray. Swap in theme tokens if you have them.
+  const statusColors: Record<TrackedStatus, string> = useMemo(
+    () => ({
+      Pending: palette.yellowDeep,
+      Approved: palette.brown,
+      Disapproved: '#B5483A',
+      Cancelled: palette.grayMuted,
+    }),
+    [palette]
+  );
+  return { styles, palette, statusColors };
 }
 
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
-  filters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    gap: 14,
-    marginBottom: 20,
-    zIndex: 10,
-    elevation: 10,
-  },
-  contentColumns: { gap: 18 },
-  desktopContentColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 22 },
-  dateField: { flexGrow: 1, flexBasis: 190 },
-  filterLabel: { marginBottom: 7, color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
-  dateInput: {
-    height: 46,
-    paddingHorizontal: 13,
-    borderRadius: 4,
-    backgroundColor: RcsColors.surface,
-    borderWidth: 1,
-    borderColor: RcsColors.border,
-    color: RcsColors.text,
-    fontSize: 13,
-  },
-  statusFilter: { flexGrow: 1, flexBasis: 230 },
-  summaryCard: {
-    minWidth: 0,
-    padding: 21,
-    borderRadius: 4,
-    backgroundColor: RcsColors.surface,
-    borderWidth: 1,
-    borderColor: RcsColors.border,
-  },
-  desktopSummaryCard: { flex: 1 },
-  summaryEyebrow: { color: RcsColors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  summaryTitle: { marginTop: 10, color: RcsColors.text, fontSize: 16, fontWeight: '700' },
-  summaryValue: { marginTop: 4, color: RcsColors.brown, fontSize: 38, fontWeight: '700' },
-  summaryNote: { color: RcsColors.grayMuted, fontSize: 12 },
-  chartTitle: { marginTop: 22, color: RcsColors.text, fontSize: 14, fontWeight: '700' },
-  categoriesCard: {
-    minWidth: 0,
-    padding: 22,
-    borderRadius: 4,
-    backgroundColor: RcsColors.surface,
-    borderWidth: 1,
-    borderColor: RcsColors.border,
-  },
-  desktopCategoriesCard: { flex: 1.25 },
-  cardTitle: { color: RcsColors.text, fontSize: 17, fontWeight: '700' },
-  cardDescription: { marginTop: 5, color: RcsColors.grayMuted, fontSize: 12 },
-  chartLegend: { flexDirection: 'row', gap: 16, marginTop: 14 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  doneLegendSwatch: { width: 9, height: 9, borderRadius: 3, backgroundColor: RcsColors.brown },
-  pendingLegendSwatch: { width: 9, height: 9, borderRadius: 3, backgroundColor: RcsColors.yellowDeep },
-  legendLabel: { color: RcsColors.grayMuted, fontSize: 11, fontWeight: '600' },
-  chartCategoryList: { marginTop: 8 },
-  chartCategoryRow: { height: 23, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  chartCategoryName: { width: 92, color: RcsColors.grayDark, fontSize: 10 },
-  categoryBarTrack: { height: 9, flex: 1, flexDirection: 'row', overflow: 'hidden', borderRadius: 5, backgroundColor: RcsColors.grayLight },
-  categoryBarDone: { height: '100%', backgroundColor: RcsColors.brown },
-  categoryBarPending: { height: '100%', backgroundColor: RcsColors.yellowDeep },
-  chartNote: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 9, lineHeight: 13 },
-  categoryList: { marginVertical: 17 },
-  categoryRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: RcsColors.grayLight },
-  categoryDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: RcsColors.yellowDeep },
-  categoryName: { flex: 1, marginLeft: 10, color: RcsColors.grayDark, fontSize: 13 },
-  categoryValue: { color: RcsColors.grayMuted, fontSize: 14, fontWeight: '700' },
+    filters: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'flex-end',
+      gap: 14,
+      marginBottom: 20,
+      zIndex: 10,
+      elevation: 10,
+    },
+    dateField: { flexGrow: 1, flexBasis: 190 },
+    filterLabel: { marginBottom: 7, color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
+    dateInput: {
+      height: 46,
+      paddingHorizontal: 13,
+      borderRadius: 4,
+      backgroundColor: RcsColors.surface,
+      borderWidth: 1,
+      borderColor: RcsColors.border,
+      color: RcsColors.text,
+      fontSize: 13,
+    },
+    statusFilter: { flexGrow: 1, flexBasis: 230 },
+
+    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 18 },
+    desktopTiles: { flexWrap: 'nowrap', gap: 16, marginBottom: 22 },
+    tile: {
+      flexGrow: 1,
+      flexBasis: 140,
+      minWidth: 0,
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      borderRadius: 4,
+      backgroundColor: RcsColors.surface,
+      borderWidth: 1,
+      borderColor: RcsColors.border,
+      overflow: 'hidden',
+    },
+    tileAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+    tileValue: { color: RcsColors.text, fontSize: 30, fontWeight: '700' },
+    tileLabel: { marginTop: 2, color: RcsColors.grayMuted, fontSize: 13, fontWeight: '600' },
+
+    chartCard: {
+      minWidth: 0,
+      padding: 22,
+      borderRadius: 4,
+      backgroundColor: RcsColors.surface,
+      borderWidth: 1,
+      borderColor: RcsColors.border,
+    },
+    cardTitle: { color: RcsColors.text, fontSize: 17, fontWeight: '700' },
+    cardDescription: { marginTop: 5, color: RcsColors.grayMuted, fontSize: 12 },
+
+    chartLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 18, marginTop: 14 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    legendSwatch: { width: 12, height: 12, borderRadius: 3 },
+    legendLabel: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '600' },
+
+    chartCategoryList: { marginTop: 14 },
+    chartCategoryRow: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    chartRowEmpty: { opacity: 0.45 },
+    chartCategoryName: { width: 118, color: RcsColors.grayDark, fontSize: 13 },
+    categoryBarTrack: {
+      height: 16,
+      flex: 1,
+      borderRadius: 8,
+      overflow: 'hidden',
+      backgroundColor: RcsColors.grayLight,
+    },
+    categoryBarFill: {
+      height: '100%',
+      flexDirection: 'row',
+      gap: 2,
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    chartValue: {
+      width: 28,
+      textAlign: 'right',
+      color: RcsColors.text,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+
+    emptyState: { paddingVertical: 28, alignItems: 'center' },
+    emptyTitle: { color: RcsColors.text, fontSize: 14, fontWeight: '700' },
+    emptyText: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 12 },
   });
 }

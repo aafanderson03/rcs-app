@@ -1,5 +1,3 @@
-import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
 import {
   Montserrat_400Regular,
   Montserrat_500Medium,
@@ -7,20 +5,22 @@ import {
   Montserrat_700Bold,
   Montserrat_800ExtraBold,
 } from '@expo-google-fonts/montserrat';
-import { Image } from 'expo-image';
 import { useFonts } from 'expo-font';
+import { Image } from 'expo-image';
+import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
 
 import { DesktopSidebar } from '@/components/desktop-sidebar';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
-import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
+import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 
 const SPLASH_HOLD_DURATION_MS = 3000;
 const SPLASH_FADE_DURATION_MS = 500;
@@ -221,7 +221,6 @@ function RootLayoutContent() {
                 <Stack.Screen name="attendance" />
                 <Stack.Screen name="applications" />
                 <Stack.Screen name="ticket" />
-                <Stack.Screen name="dashboard" />
                 <Stack.Screen name="dtr" />
                 <Stack.Screen name="help" />
                 <Stack.Screen name="other-urls" />

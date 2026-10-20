@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
 import {
   ChoicePicker,
   EmptyState,
@@ -11,10 +10,11 @@ import {
   PortalPage,
   PreviewNotice,
 } from '@/components/portal-ui';
+import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
-import { useAppTheme } from '@/contexts/theme-context';
-import { formatDemoDate, relativeDate, type DemoApplication } from '@/data/demo-data';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
+import { useAppTheme } from '@/contexts/theme-context';
+import { formatDemoDate, relativeDate, type DemoApplication, type DemoApprover } from '@/data/demo-data';
 
 const transactionTypes = [
   'Attendance',
@@ -29,6 +29,7 @@ const transactionTypes = [
 ];
 const typeFilters = ['All transaction types', ...transactionTypes];
 const statusFilters = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
+const trackedStatuses = ['Pending', 'Approved', 'Disapproved', 'Cancelled'];
 
 type RequestField = {
   key: string;
@@ -358,7 +359,7 @@ const requestForms: Record<string, RequestSection[]> = {
 };
 
 export default function ApplicationsScreen() {
-  const { colorScheme, palette, styles } = useApplicationStyles();
+  const { colorScheme, palette, styles, statusColors } = useApplicationStyles();
   const { applications, cancelDemoApplication, submitDemoApplication } = useDemoSubmissions();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
@@ -376,23 +377,22 @@ export default function ApplicationsScreen() {
   });
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [lastSubmission, setLastSubmission] = useState<DemoApplication | null>(null);
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const filteredApplications = applications.filter((item) =>
-    (statusFilter === 'All statuses' || item.status === statusFilter) &&
-    (transactionFilter === 'All transaction types' || item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile')))
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const selectedApplication = applications.find((item) => item.id === selectedId) ?? null;
+  // Transaction + date filters feed the status tiles; the status tile then narrows the list.
+  const baseApplications = applications.filter((item) =>
+    (transactionFilter === 'All transaction types' || item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile'))) &&
+    (!from || item.submittedAt >= from) &&
+    (!to || item.submittedAt <= to)
+  );
+  const filteredApplications = baseApplications.filter(
+    (item) => statusFilter === 'All statuses' || item.status === statusFilter
   );
   const markedDates = filteredApplications.map((item) => item.submittedAt);
   const selectedDateKey = selectedDate ? [selectedDate.getFullYear(), String(selectedDate.getMonth() + 1).padStart(2, '0'), String(selectedDate.getDate()).padStart(2, '0')].join('-') : '';
   const selectedApplications = filteredApplications.filter((item) => item.submittedAt === selectedDateKey);
-  const closeCancellation = () => {
-    setConfirmCancelId(null);
-    setCancelReason('');
-  };
-  const confirmCancellation = (applicationId: string) => {
-    if (!cancelReason.trim()) return;
-    if (cancelDemoApplication(applicationId, cancelReason)) closeCancellation();
-  };
 
   const continueToRequest = () => {
     if (!selectedTransaction) {
@@ -413,6 +413,16 @@ export default function ApplicationsScreen() {
           setLastSubmission(submitDemoApplication(transaction, values));
           setShowRequestForm(false);
         }}
+      />
+    );
+  }
+
+  if (selectedApplication) {
+    return (
+      <ApplicationDetail
+        item={selectedApplication}
+        onBack={() => setSelectedId(null)}
+        onCancel={(reason) => cancelDemoApplication(selectedApplication.id, reason)}
       />
     );
   }
@@ -471,7 +481,7 @@ export default function ApplicationsScreen() {
                 onPress={continueToRequest}
                 style={({ pressed }) => [
                   styles.continueButton,
-                  isDesktop &&                   isDesktop && styles.desktopContinueButton,
+                  isDesktop && styles.desktopContinueButton,
                   !selectedTransaction && styles.continueButtonDisabled,
                   pressed && selectedTransaction && styles.pressed,
                 ]}
@@ -487,7 +497,7 @@ export default function ApplicationsScreen() {
             <View style={styles.listHeading}>
               <View style={styles.listHeadingCopy}>
                 <Text style={styles.listTitle}>Submitted applications</Text>
-                <Text style={styles.listSubtitle}>{filteredApplications.length} sample requests · filter below</Text>
+                <Text style={styles.listSubtitle}>{filteredApplications.length} sample requests · tap one for details</Text>
               </View>
               <View style={styles.viewToggle}>
                 <Pressable
@@ -513,6 +523,30 @@ export default function ApplicationsScreen() {
               </View>
             </View>
 
+            <View style={styles.tiles}>
+              {statusFilters.map((name) => {
+                const isAll = name === 'All statuses';
+                const count = isAll
+                  ? baseApplications.length
+                  : baseApplications.filter((item) => item.status === name).length;
+                const selected = statusFilter === name;
+                return (
+                  <Pressable
+                    key={name}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${count} ${isAll ? 'total' : name.toLowerCase()} requests. Tap to filter.`}
+                    onPress={() => setStatusFilter(selected && !isAll ? 'All statuses' : name)}
+                    style={({ pressed }) => [styles.tile, selected && styles.tileSelected, pressed && styles.pressed]}
+                  >
+                    <View style={[styles.tileAccent, { backgroundColor: isAll ? palette.grayMuted : statusColors[name] }]} />
+                    <Text style={styles.tileValue}>{count}</Text>
+                    <Text style={styles.tileLabel}>{isAll ? 'All' : name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <View style={[styles.filters, isDesktop && styles.desktopFilters]}>
               <View
                 style={[
@@ -529,58 +563,41 @@ export default function ApplicationsScreen() {
                   onChange={setTransactionFilter}
                 />
               </View>
-              <View
-                style={[
-                  styles.filterPicker,
-                  openPagePicker === 'status-filter' && styles.activeFilterPicker,
-                ]}
-              >
-                <OptionPicker
-                  label="Filter by status"
-                  value={statusFilter}
-                  options={statusFilters}
-                  open={openPagePicker === 'status-filter'}
-                  onOpenChange={(open) => setOpenPagePicker(open ? 'status-filter' : null)}
-                  onChange={setStatusFilter}
-                />
+              <View style={styles.dateRow}>
+                <View style={styles.dateField}>
+                  <Text style={styles.pickerLabel}>From</Text>
+                  <TextInput
+                    accessibilityLabel="From date"
+                    value={from}
+                    onChangeText={setFrom}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={palette.grayMuted}
+                    style={styles.formInput}
+                  />
+                </View>
+                <View style={styles.dateField}>
+                  <Text style={styles.pickerLabel}>To</Text>
+                  <TextInput
+                    accessibilityLabel="To date"
+                    value={to}
+                    onChangeText={setTo}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={palette.grayMuted}
+                    style={styles.formInput}
+                  />
+                </View>
               </View>
             </View>
 
             {view === 'list' ? (
               <View style={styles.applicationList}>
-                {filteredApplications.length ? filteredApplications.map((item) => <View key={item.id} style={styles.applicationCard}>
-                  <View style={styles.applicationCardTop}><Text style={styles.applicationType}>{item.type}</Text><Text style={[styles.statusPill, item.status === 'Approved' && styles.approvedPill, item.status === 'Disapproved' && styles.disapprovedPill, item.status === 'Cancelled' && styles.cancelledPill]}>{item.status}</Text></View>
-                  <Text style={styles.applicationSummary}>{item.summary}</Text>
-                  <Text style={styles.applicationMeta}>{item.id} · Submitted {formatDemoDate(item.submittedAt, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                  {item.details?.slice(2, 5).map((detail) => <Text key={`${item.id}-${detail.label}`} style={styles.applicationMeta}>{detail.label}: {detail.value}</Text>)}
-                  {item.cancellationReason ? <Text style={styles.cancellationReason}>Cancellation reason: {item.cancellationReason}</Text> : null}
-                  {item.status === 'Pending' ? confirmCancelId === item.id ? (
-                    <View style={styles.cancelConfirmation}>
-                      <Text style={styles.cancelPrompt}>Why are you cancelling this request?</Text>
-                      <TextInput
-                        accessibilityLabel="Reason for cancelling this application"
-                        value={cancelReason}
-                        onChangeText={setCancelReason}
-                        placeholder="Enter a cancellation reason"
-                        placeholderTextColor={palette.grayMuted}
-                        multiline
-                        style={[styles.formInput, styles.cancelReasonInput]}
-                      />
-                      <View style={styles.cancelActions}>
-                        <Pressable accessibilityRole="button" onPress={closeCancellation} style={({ pressed }) => [styles.keepRequestButton, pressed && styles.pressed]}>
-                          <Text style={styles.keepRequestText}>Keep request</Text>
-                        </Pressable>
-                        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !cancelReason.trim() }} disabled={!cancelReason.trim()} onPress={() => confirmCancellation(item.id)} style={({ pressed }) => [styles.cancelRequestButton, !cancelReason.trim() && styles.cancelButtonDisabled, pressed && styles.pressed]}>
-                          <Text style={styles.cancelRequestText}>Confirm cancel</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Cancel pending ${item.type} request`} onPress={() => { setCancelReason(''); setConfirmCancelId(item.id); }} style={({ pressed }) => [styles.cancelLink, pressed && styles.pressed]}>
-                      <Text style={styles.cancelLinkText}>Cancel request</Text>
-                    </Pressable>
-                  ) : null}
-                </View>) : <EmptyState title="No matching sample requests" description="Change the transaction or status filters to see other demo entries." />}
+                {filteredApplications.length ? (
+                  filteredApplications.map((item) => (
+                    <ApplicationCard key={item.id} item={item} onPress={() => setSelectedId(item.id)} />
+                  ))
+                ) : (
+                  <EmptyState title="No matching sample requests" description="Change the transaction or status filters to see other demo entries." />
+                )}
               </View>
             ) : (
               <View>
@@ -602,13 +619,255 @@ export default function ApplicationsScreen() {
                 <Text style={styles.calendarNote}>
                   {selectedDate ? `${selectedApplications.length} sample request${selectedApplications.length === 1 ? '' : 's'} on ${formatDemoDate(selectedDateKey)}.` : 'Marked days have sample request activity. Select a date to see its requests.'}
                 </Text>
-                {selectedApplications.map((item) => <View key={item.id} style={[styles.applicationCard, styles.calendarApplication]}><Text style={styles.applicationType}>{item.type} · {item.status}</Text><Text style={styles.applicationSummary}>{item.summary}</Text><Text style={styles.applicationMeta}>{item.id}</Text>{item.cancellationReason ? <Text style={styles.cancellationReason}>Cancellation reason: {item.cancellationReason}</Text> : null}{item.status === 'Pending' ? confirmCancelId === item.id ? <View style={styles.cancelConfirmation}><Text style={styles.cancelPrompt}>Why are you cancelling this request?</Text><TextInput accessibilityLabel="Reason for cancelling this application" value={cancelReason} onChangeText={setCancelReason} placeholder="Enter a cancellation reason" placeholderTextColor={palette.grayMuted} multiline style={[styles.formInput, styles.cancelReasonInput]} /><View style={styles.cancelActions}><Pressable accessibilityRole="button" onPress={closeCancellation} style={({ pressed }) => [styles.keepRequestButton, pressed && styles.pressed]}><Text style={styles.keepRequestText}>Keep request</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: !cancelReason.trim() }} disabled={!cancelReason.trim()} onPress={() => confirmCancellation(item.id)} style={({ pressed }) => [styles.cancelRequestButton, !cancelReason.trim() && styles.cancelButtonDisabled, pressed && styles.pressed]}><Text style={styles.cancelRequestText}>Confirm cancel</Text></Pressable></View></View> : <Pressable accessibilityRole="button" accessibilityLabel={`Cancel pending ${item.type} request`} onPress={() => { setCancelReason(''); setConfirmCancelId(item.id); }} style={({ pressed }) => [styles.cancelLink, pressed && styles.pressed]}><Text style={styles.cancelLinkText}>Cancel request</Text></Pressable> : null}</View>)}
+                {selectedApplications.map((item) => (
+                  <View key={item.id} style={styles.calendarApplication}>
+                    <ApplicationCard item={item} onPress={() => setSelectedId(item.id)} />
+                  </View>
+                ))}
               </View>
             )}
+
+            <StatusBreakdown rows={filteredApplications} />
           </View>
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function StatusBreakdown({ rows }: { rows: DemoApplication[] }) {
+  const { styles, statusColors } = useApplicationStyles();
+  if (!rows.length) return null;
+
+  const categories = transactionTypes
+    .map((type) => {
+      const typeRows = rows.filter((item) => item.type === type);
+      const byStatus = trackedStatuses.map((name) => ({
+        name,
+        count: typeRows.filter((item) => item.status === name).length,
+      }));
+      return { type, byStatus, total: typeRows.length };
+    })
+    .sort((a, b) => b.total - a.total || a.type.localeCompare(b.type));
+  const max = Math.max(1, ...categories.map((item) => item.total));
+
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>Breakdown by transaction type</Text>
+      <Text style={styles.listSubtitle}>Follows the filters above.</Text>
+      <View style={styles.chartLegend}>
+        {trackedStatuses.map((name) => (
+          <View key={name} style={styles.legendItem}>
+            <View style={[styles.legendSwatch, { backgroundColor: statusColors[name] }]} />
+            <Text style={styles.legendLabel}>{name}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.chartList}>
+        {categories.map(({ type, byStatus, total }) => (
+          <View key={type} style={[styles.chartRow, total === 0 && styles.chartRowEmpty]}>
+            <Text style={styles.chartName} numberOfLines={1}>{type}</Text>
+            <View
+              accessible
+              accessibilityLabel={`${type}: ${byStatus.map((s) => `${s.count} ${s.name.toLowerCase()}`).join(', ')}`}
+              style={styles.chartTrack}
+            >
+              {total > 0 ? (
+                <View style={[styles.chartFill, { width: `${(total / max) * 100}%` }]}>
+                  {byStatus.map(({ name, count }) =>
+                    count > 0 ? <View key={name} style={{ flex: count, backgroundColor: statusColors[name] }} /> : null
+                  )}
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.chartValue}>{total}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const { styles } = useApplicationStyles();
+  return (
+    <Text
+      style={[
+        styles.statusPill,
+        status === 'Approved' && styles.approvedPill,
+        status === 'Disapproved' && styles.disapprovedPill,
+        (status === 'Cancelled' || status === 'Skipped' || status === 'Waiting') && styles.cancelledPill,
+      ]}
+    >
+      {status}
+    </Text>
+  );
+}
+
+function ApplicationCard({ item, onPress }: { item: DemoApplication; onPress: () => void }) {
+  const { styles } = useApplicationStyles();
+  const date = formatDemoDate(item.submittedAt, { month: 'short', day: 'numeric', year: 'numeric' });
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${item.type}, ${item.status}, submitted ${date}. Tap for details.`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.applicationCard, styles.applicationCardRow, pressed && styles.pressed]}
+    >
+      <View style={styles.applicationCardMain}>
+        <Text style={styles.applicationType}>{item.type}</Text>
+        <Text style={styles.applicationMeta}>{date}</Text>
+      </View>
+      <StatusPill status={item.status} />
+      <Text style={styles.pickerChevron}>›</Text>
+    </Pressable>
+  );
+}
+
+function getApprovers(item: DemoApplication): DemoApprover[] {
+  if (item.approvers?.length) {
+    // A cancelled request never reaches approvers who had not acted yet.
+    return item.status === 'Cancelled'
+      ? item.approvers.map((approver) =>
+          approver.status === 'Pending' || approver.status === 'Waiting'
+            ? { ...approver, status: 'Skipped' as const }
+            : approver
+        )
+      : item.approvers;
+  }
+  // Fictional fallback chain derived from the request status.
+  const s = item.status;
+  return [
+    {
+      name: 'Maria Santos',
+      role: 'Immediate supervisor',
+      status: s === 'Pending' ? 'Pending' : s === 'Cancelled' ? 'Skipped' : s === 'Disapproved' ? 'Disapproved' : 'Approved',
+      actedAt: s === 'Pending' || s === 'Cancelled' ? undefined : item.submittedAt,
+    },
+    {
+      name: 'Jose Reyes',
+      role: 'HR approver',
+      status: s === 'Approved' ? 'Approved' : s === 'Pending' ? 'Waiting' : 'Skipped',
+      actedAt: s === 'Approved' ? item.submittedAt : undefined,
+    },
+  ];
+}
+
+function ApplicationDetail({
+  item,
+  onBack,
+  onCancel,
+}: {
+  item: DemoApplication;
+  onBack: () => void;
+  onCancel: (reason: string) => boolean;
+}) {
+  const { palette, styles } = useApplicationStyles();
+  const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState('');
+  const approvers = getApprovers(item);
+
+  return (
+    <PortalPage>
+      <Pressable accessibilityRole="button" onPress={onBack} style={styles.formBackButton}>
+        <Text style={styles.formBackText}>‹  Back to applications</Text>
+      </Pressable>
+      <PageHeading title={`${item.type} request`} description={item.summary} />
+
+      <View style={styles.detailCard}>
+        <Text style={styles.formSectionTitle}>Request details</Text>
+        <DetailRow label="Reference" value={item.id} />
+        <DetailRow label="Status" pill={item.status} />
+        <DetailRow
+          label="Submitted"
+          value={formatDemoDate(item.submittedAt, { month: 'long', day: 'numeric', year: 'numeric' })}
+        />
+        {item.details?.map((detail) => (
+          <DetailRow key={`${item.id}-${detail.label}`} label={detail.label} value={detail.value} />
+        ))}
+        {item.cancellationReason ? (
+          <DetailRow label="Cancellation reason" value={item.cancellationReason} />
+        ) : null}
+      </View>
+
+      <View style={styles.detailCard}>
+        <Text style={styles.formSectionTitle}>Approvers</Text>
+        {approvers.map((approver, index) => (
+          <View key={`${approver.name}-${index}`} style={styles.approverRow}>
+            <View style={styles.approverCopy}>
+              <Text style={styles.approverName}>{approver.name}</Text>
+              <Text style={styles.applicationMeta}>{approver.role}</Text>
+              {approver.actedAt ? (
+                <Text style={styles.applicationMeta}>
+                  {formatDemoDate(approver.actedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
+              ) : null}
+              {approver.remarks ? <Text style={styles.cancellationReason}>“{approver.remarks}”</Text> : null}
+            </View>
+            <StatusPill status={approver.status} />
+          </View>
+        ))}
+      </View>
+
+      {item.status === 'Pending' ? (
+        confirming ? (
+          <View style={styles.cancelConfirmation}>
+            <Text style={styles.cancelPrompt}>Why are you cancelling this request?</Text>
+            <TextInput
+              accessibilityLabel="Reason for cancelling this application"
+              value={reason}
+              onChangeText={setReason}
+              placeholder="Enter a cancellation reason"
+              placeholderTextColor={palette.grayMuted}
+              multiline
+              style={[styles.formInput, styles.cancelReasonInput]}
+            />
+            <View style={styles.cancelActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setConfirming(false);
+                  setReason('');
+                }}
+                style={({ pressed }) => [styles.keepRequestButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.keepRequestText}>Keep request</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !reason.trim() }}
+                disabled={!reason.trim()}
+                onPress={() => {
+                  if (reason.trim() && onCancel(reason)) onBack();
+                }}
+                style={({ pressed }) => [styles.cancelRequestButton, !reason.trim() && styles.cancelButtonDisabled, pressed && styles.pressed]}
+              >
+                <Text style={styles.cancelRequestText}>Confirm cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Cancel pending ${item.type} request`}
+            onPress={() => setConfirming(true)}
+            style={({ pressed }) => [styles.cancelLink, pressed && styles.pressed]}
+          >
+            <Text style={styles.cancelLinkText}>Cancel request</Text>
+          </Pressable>
+        )
+      ) : null}
+    </PortalPage>
+  );
+}
+
+function DetailRow({ label, value, pill }: { label: string; value?: string; pill?: string }) {
+  const { styles } = useApplicationStyles();
+  return (
+    <View style={styles.reviewRow}>
+      <Text style={styles.reviewLabel}>{label}</Text>
+      {pill ? <StatusPill status={pill} /> : <Text style={styles.reviewValue}>{value}</Text>}
+    </View>
   );
 }
 
@@ -1104,7 +1363,16 @@ function useApplicationStyles() {
   const { colorScheme } = useAppTheme();
   const palette = getPaletteForScheme(colorScheme);
   const styles = useMemo(() => createStyles(palette), [palette]);
-  return { colorScheme, palette, styles };
+  const statusColors: Record<string, string> = useMemo(
+    () => ({
+      Pending: palette.yellowDeep,
+      Approved:  '#315A36',
+      Disapproved: '#B5483A',
+      Cancelled: palette.grayMuted,
+    }),
+    [palette]
+  );
+  return { colorScheme, palette, styles, statusColors };
 }
 
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
@@ -1225,7 +1493,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   calendarNote: { marginTop: 12, color: RcsColors.grayMuted, fontSize: 12 },
   applicationList: { gap: 10 },
   applicationCard: { padding: 15, borderRadius: 4, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
-  applicationCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  applicationCardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
+  applicationCardMain: { flex: 1, minWidth: 0 },
   applicationType: { color: RcsColors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   statusPill: { overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 3, backgroundColor: RcsColors.yellowLight, color: RcsColors.brownDark, fontSize: 10, fontWeight: '700' },
   approvedPill: { backgroundColor: '#DDEBDD', color: '#315A36' },
@@ -1246,6 +1515,66 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   cancelButtonDisabled: { opacity: 0.5 },
   cancelRequestText: { color: RcsColors.white, fontSize: 12, fontWeight: '700' },
   calendarApplication: { marginTop: 10 },
+  dateRow: { flex: 1, minWidth: 0, flexDirection: 'row', gap: 12 },
+  dateField: { flex: 1, minWidth: 0 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
+  tile: {
+    flexGrow: 1,
+    flexBasis: 96,
+    minWidth: 0,
+    minHeight: 76,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+    overflow: 'hidden',
+  },
+  tileSelected: { backgroundColor: RcsColors.yellowLight, borderColor: RcsColors.brown },
+  tileAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  tileValue: { color: RcsColors.text, fontSize: 24, fontWeight: '700' },
+  tileLabel: { marginTop: 2, color: RcsColors.grayMuted, fontSize: 12, fontWeight: '600' },
+  chartCard: {
+    marginTop: 24,
+    padding: 20,
+    borderRadius: 4,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  chartTitle: { color: RcsColors.text, fontSize: 16, fontWeight: '700' },
+  chartLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  legendSwatch: { width: 12, height: 12, borderRadius: 3 },
+  legendLabel: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '600' },
+  chartList: { marginTop: 12 },
+  chartRow: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  chartRowEmpty: { opacity: 0.45 },
+  chartName: { width: 118, color: RcsColors.grayDark, fontSize: 13 },
+  chartTrack: { height: 16, flex: 1, borderRadius: 8, overflow: 'hidden', backgroundColor: RcsColors.grayLight },
+  chartFill: { height: '100%', flexDirection: 'row', gap: 2, borderRadius: 8, overflow: 'hidden' },
+  chartValue: { width: 28, textAlign: 'right', color: RcsColors.text, fontSize: 13, fontWeight: '700' },
+  detailCard: {
+    padding: 20,
+    marginBottom: 16,
+    borderRadius: 4,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  approverRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: RcsColors.border,
+  },
+  approverCopy: { flex: 1, minWidth: 0 },
+  approverName: { color: RcsColors.text, fontSize: 14, fontWeight: '700' },
   receiptCard: { padding: 16, marginBottom: 18, borderRadius: 4, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
   receiptTitle: { color: RcsColors.brownDark, fontSize: 14, fontWeight: '800' },
   pressed: { opacity: 0.75 },
@@ -1390,7 +1719,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   fillSampleButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   reviewTitle: { color: RcsColors.brownDark, fontSize: 17, fontWeight: '800' },
   reviewDescription: { marginTop: 5, marginBottom: 12, color: RcsColors.grayDark, fontSize: 12 },
-  reviewRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: RcsColors.border },
+  reviewRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: RcsColors.border },
   reviewLabel: { flex: 1, color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
   reviewValue: { flex: 1, color: RcsColors.text, fontSize: 12, textAlign: 'right' },
   });

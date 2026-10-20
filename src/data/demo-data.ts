@@ -30,6 +30,14 @@ export type DemoMonthlyLateSummary = {
   sanctionThresholdReached: boolean;
 };
 
+export type DemoApprover = {
+  name: string;
+  role: string;
+  status: "Approved" | "Disapproved" | "Pending" | "Waiting" | "Skipped";
+  actedAt?: string; // YYYY-MM-DD
+  remarks?: string;
+};
+
 export type DemoApplication = {
   id: string;
   type: string;
@@ -38,6 +46,7 @@ export type DemoApplication = {
   status: "Pending" | "Approved" | "Disapproved" | "Cancelled";
   cancellationReason?: string;
   details?: { label: string; value: string }[];
+  approvers?: DemoApprover[];
 };
 
 const today = new Date();
@@ -288,6 +297,24 @@ export const demoApplications: DemoApplication[] = [
     summary: "Vacation leave · 1 day",
     submittedAt: relativeDate(-1),
     status: "Pending",
+    details: [
+      { label: "Leave type", value: "Service Incentive Leave" },
+      { label: "Date from", value: formatDemoDate(relativeDate(5)) },
+      { label: "Date to", value: formatDemoDate(relativeDate(5)) },
+      { label: "Applied days", value: "1" },
+      { label: "Period", value: "Whole Day" },
+      { label: "Reason", value: "Family errand · Sample" },
+    ],
+    approvers: [
+      {
+        name: demoEmployee.manager,
+        role: "Immediate supervisor",
+        status: "Approved",
+        actedAt: relativeDate(-1),
+        remarks: "Coverage arranged for the day.",
+      },
+      { name: "Paolo Reyes", role: "HR approver", status: "Pending" },
+    ],
   },
   {
     id: "DEMO-APP-1079",
@@ -295,6 +322,27 @@ export const demoApplications: DemoApplication[] = [
     summary: "Missing time out · Store closing shift",
     submittedAt: relativeDate(-4),
     status: "Approved",
+    details: [
+      { label: "DTR type", value: "FIELD DUTY NO TIME OUT" },
+      { label: "Date", value: formatDemoDate(relativeDate(-5)) },
+      { label: "Time out", value: "06:15 PM" },
+      { label: "Reason", value: "Closing duties ran late · Sample" },
+    ],
+    approvers: [
+      {
+        name: demoEmployee.manager,
+        role: "Immediate supervisor",
+        status: "Approved",
+        actedAt: relativeDate(-4),
+      },
+      {
+        name: "Paolo Reyes",
+        role: "HR approver",
+        status: "Approved",
+        actedAt: relativeDate(-3),
+        remarks: "Verified against store log.",
+      },
+    ],
   },
   {
     id: "DEMO-APP-1068",
@@ -302,6 +350,20 @@ export const demoApplications: DemoApplication[] = [
     summary: "Inventory count · 2.0 hours",
     submittedAt: relativeDate(-8),
     status: "Pending",
+    details: [
+      { label: "Applicable date", value: formatDemoDate(relativeDate(-9)) },
+      { label: "OT after shift", value: "05:30 PM – 07:30 PM" },
+      { label: "Total applied hours", value: "2.0" },
+      { label: "Reason", value: "Quarterly inventory count · Sample" },
+    ],
+    approvers: [
+      {
+        name: demoEmployee.manager,
+        role: "Immediate supervisor",
+        status: "Pending",
+      },
+      { name: "Paolo Reyes", role: "HR approver", status: "Waiting" },
+    ],
   },
   {
     id: "DEMO-APP-1052",
@@ -309,6 +371,28 @@ export const demoApplications: DemoApplication[] = [
     summary: "Uniform loan · ₱1,250.00",
     submittedAt: relativeDate(-15),
     status: "Disapproved",
+    details: [
+      { label: "Loan type", value: "Uniform loan" },
+      { label: "Principal", value: "₱1,250.00" },
+      { label: "Terms of payment", value: "3 | 0%" },
+      { label: "Deduction amount", value: "₱416.67" },
+      { label: "Reason", value: "Replacement uniform · Sample" },
+    ],
+    approvers: [
+      {
+        name: demoEmployee.manager,
+        role: "Immediate supervisor",
+        status: "Approved",
+        actedAt: relativeDate(-14),
+      },
+      {
+        name: "Lara Cruz",
+        role: "HR approver",
+        status: "Disapproved",
+        actedAt: relativeDate(-12),
+        remarks: "Existing loan balance must be settled first.",
+      },
+    ],
   },
   {
     id: "DEMO-APP-1036",
@@ -316,6 +400,18 @@ export const demoApplications: DemoApplication[] = [
     summary: "Update contact details",
     submittedAt: relativeDate(-23),
     status: "Approved",
+    details: [
+      { label: "Field changed", value: "Mobile No" },
+      { label: "New value", value: "09XX-XXX-0000 · Sample" },
+    ],
+    approvers: [
+      {
+        name: "Lara Cruz",
+        role: "HR approver",
+        status: "Approved",
+        actedAt: relativeDate(-22),
+      },
+    ],
   },
   {
     id: "DEMO-APP-1021",
@@ -323,6 +419,21 @@ export const demoApplications: DemoApplication[] = [
     summary: "Rest day adjustment · 1 day",
     submittedAt: relativeDate(-29),
     status: "Cancelled",
+    cancellationReason: "Schedule changed before approval · Sample",
+    details: [
+      { label: "Date from", value: formatDemoDate(relativeDate(-26)) },
+      { label: "Date to", value: formatDemoDate(relativeDate(-26)) },
+      { label: "Rest day 1", value: "Wednesday" },
+      { label: "Reason", value: "Swap with coworker · Sample" },
+    ],
+    approvers: [
+      {
+        name: demoEmployee.manager,
+        role: "Immediate supervisor",
+        status: "Skipped",
+      },
+      { name: "Paolo Reyes", role: "HR approver", status: "Skipped" },
+    ],
   },
 ];
 

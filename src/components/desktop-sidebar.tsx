@@ -10,7 +10,6 @@ import { useAppTheme } from '@/contexts/theme-context';
 
 type Route =
   | '/home'
-  | '/dashboard'
   | '/announcements'
   | '/attendance'
   | '/applications'
@@ -187,7 +186,6 @@ export function DesktopSidebar({
         <Text style={styles.sectionLabel}>WORKSPACE</Text>
         {renderLink({ label: 'Home', route: '/home' }, true)}
         {renderLink({ label: 'Announcement', route: '/announcements' }, true)}
-        {renderLink({ label: 'Dashboard', route: '/dashboard' }, true)}
         {renderLink({ label: 'Attendance & DTR', route: '/attendance' }, true)}
         {renderLink({ label: 'Applications', route: '/applications' }, true)}
 

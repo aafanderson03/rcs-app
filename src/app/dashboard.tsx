@@ -64,7 +64,7 @@ export default function DashboardScreen() {
         title="Dashboard"
         description="A clear overview of requests and their current status."
       />
-      <PreviewNotice>Fictional request activity for presentation only. These examples do not represent live employee records.</PreviewNotice>
+      <PreviewNotice>Request totals are based on applications saved to your account.</PreviewNotice>
 
       <View style={styles.filters}>
         <DateField label="From" value={from} onChangeText={setFrom} />
@@ -79,33 +79,42 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      <View style={[styles.tiles, isDesktop && styles.desktopTiles]}>
-        {statusTotals.map(({ name, count }) => (
-          <View
-            key={name}
-            accessible
-            accessibilityLabel={`${count} ${name.toLowerCase()} requests`}
-            style={styles.tile}
-          >
-            <View style={[styles.tileAccent, { backgroundColor: statusColors[name] }]} />
-            <Text style={styles.tileValue}>{count}</Text>
-            <Text style={styles.tileLabel}>{name}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.chartCard}>
-        <Text style={styles.cardTitle}>Applications by transaction type</Text>
-        <Text style={styles.cardDescription}>
-          {rows.length} {rows.length === 1 ? 'request matches' : 'requests match'} · {status.toLowerCase()}
-          {dateSummary}
-        </Text>
-
-        <View style={styles.chartLegend}>
-          {trackedStatuses.map((name) => (
-            <View key={name} style={styles.legendItem}>
-              <View style={[styles.legendSwatch, { backgroundColor: statusColors[name] }]} />
-              <Text style={styles.legendLabel}>{name}</Text>
+      <View style={[styles.contentColumns, isDesktop && styles.desktopContentColumns]}>
+        <View style={[styles.summaryCard, isDesktop && styles.desktopSummaryCard]}>
+            <Text style={styles.summaryEyebrow}>REQUEST OVERVIEW</Text>
+            <Text style={styles.summaryTitle}>Pending applications</Text>
+            <Text style={styles.summaryValue}>{pendingCount}</Text>
+            <Text style={styles.summaryNote}>Applications awaiting review</Text>
+            <Text style={styles.summaryNote}>{applications.length} applications in total</Text>
+            <Text style={styles.chartTitle}>Applications by status</Text>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={styles.doneLegendSwatch} />
+                <Text style={styles.legendLabel}>Done</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={styles.pendingLegendSwatch} />
+                <Text style={styles.legendLabel}>Pending</Text>
+              </View>
+            </View>
+            <View style={styles.chartCategoryList}>
+              {categoryCounts.map(({ category, done, pending }) => (
+                <View key={category} style={styles.chartCategoryRow}>
+                  <Text style={styles.chartCategoryName} numberOfLines={1}>{category}</Text>
+                  <View
+                    accessible
+                    accessibilityLabel={`${category}: ${done} done, ${pending} pending`}
+                    style={styles.categoryBarTrack}
+                  >
+                    {done > 0 ? (
+                      <View style={[styles.categoryBarDone, { width: `${(done / maxCategoryCount) * 100}%` }]} />
+                    ) : null}
+                    {pending > 0 ? (
+                      <View style={[styles.categoryBarPending, { width: `${(pending / maxCategoryCount) * 100}%` }]} />
+                    ) : null}
+                  </View>
+                </View>
+              ))}
             </View>
           ))}
         </View>

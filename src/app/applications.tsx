@@ -359,7 +359,7 @@ const requestForms: Record<string, RequestSection[]> = {
 
 export default function ApplicationsScreen() {
   const { colorScheme, palette, styles } = useApplicationStyles();
-  const { applications, cancelDemoApplication, submitDemoApplication } = useDemoSubmissions();
+  const { applications, isLoading, error, cancelDemoApplication, submitDemoApplication } = useDemoSubmissions();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const compactScreen = width < 380;
@@ -389,9 +389,14 @@ export default function ApplicationsScreen() {
     setConfirmCancelId(null);
     setCancelReason('');
   };
-  const confirmCancellation = (applicationId: string) => {
+  const confirmCancellation = async (applicationId: string) => {
     if (!cancelReason.trim()) return;
-    if (cancelDemoApplication(applicationId, cancelReason)) closeCancellation();
+    try {
+      if (await cancelDemoApplication(applicationId, cancelReason)) closeCancellation();
+      else setNotice('This application is no longer pending and cannot be cancelled.');
+    } catch (cancelError) {
+      setNotice(cancelError instanceof Error ? cancelError.message : 'Unable to cancel this application.');
+    }
   };
 
   const continueToRequest = () => {
@@ -409,8 +414,9 @@ export default function ApplicationsScreen() {
         key={selectedTransaction}
         transaction={selectedTransaction}
         onBack={() => setShowRequestForm(false)}
-        onSubmit={(transaction, values) => {
-          setLastSubmission(submitDemoApplication(transaction, values));
+        onSubmit={async (transaction, values) => {
+          const application = await submitDemoApplication(transaction, values);
+          setLastSubmission(application);
           setShowRequestForm(false);
         }}
       />
@@ -434,8 +440,11 @@ export default function ApplicationsScreen() {
           </Text>
         </View>
 
-        <PreviewNotice>All records are fictional presentation data. Forms can be submitted to local demo history only; no live employee system is contacted.</PreviewNotice>
-        {lastSubmission ? <View style={styles.receiptCard}><Text style={styles.receiptTitle}>Demo request submitted</Text><Text style={styles.applicationSummary}>{lastSubmission.summary}</Text><Text style={styles.applicationMeta}>Receipt {lastSubmission.id} · Added to this device&apos;s demo history</Text></View> : null}
+        <PreviewNotice>Applications are saved to your account and are available on the web and mobile app.</PreviewNotice>
+        {error ? <Text style={styles.notice}>{error}</Text> : null}
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {isLoading ? <Text style={styles.listSubtitle}>Loading your applications…</Text> : null}
+        {lastSubmission ? <View style={styles.receiptCard}><Text style={styles.receiptTitle}>Application submitted</Text><Text style={styles.applicationSummary}>{lastSubmission.summary}</Text><Text style={styles.applicationMeta}>Receipt {lastSubmission.id} · Saved to your account</Text></View> : null}
 
         <View style={[styles.contentColumns, isDesktop && styles.desktopContentColumns]}>
           <View style={[styles.startCard, isDesktop && styles.desktopStartCard, openPagePicker === 'start-transaction' && styles.openPickerCard]}>
@@ -487,7 +496,7 @@ export default function ApplicationsScreen() {
             <View style={styles.listHeading}>
               <View style={styles.listHeadingCopy}>
                 <Text style={styles.listTitle}>Submitted applications</Text>
-                <Text style={styles.listSubtitle}>{filteredApplications.length} sample requests · filter below</Text>
+                <Text style={styles.listSubtitle}>{filteredApplications.length} requests · filter below</Text>
               </View>
               <View style={styles.viewToggle}>
                 <Pressable
@@ -619,7 +628,7 @@ function RequestForm({
 }: {
   transaction: string;
   onBack: () => void;
-  onSubmit: (transaction: string, values: Record<string, string>) => void;
+  onSubmit: (transaction: string, values: Record<string, string>) => Promise<void>;
 }) {
   const { palette, styles } = useApplicationStyles();
   const { width } = useWindowDimensions();
@@ -627,6 +636,8 @@ function RequestForm({
   const [values, setValues] = useState<Record<string, string>>({});
   const [showErrors, setShowErrors] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
   const [dependentCount, setDependentCount] = useState(1);
   const [openPickerField, setOpenPickerField] = useState<string | null>(null);
   const sections = requestForms[transaction] ?? [];
@@ -658,13 +669,20 @@ function RequestForm({
     setReviewing(true);
   };
 
-  const submitRequest = () => {
+  const submitRequest = async () => {
     setShowErrors(true);
     if (missingFields.length > 0) {
       setReviewing(false);
       return;
     }
-    onSubmit(transaction, values);
+    setIsSubmitting(true);
+    setSubmissionError('');
+    try {
+      await onSubmit(transaction, values);
+    } catch (submitError) {
+      setSubmissionError(submitError instanceof Error ? submitError.message : 'Unable to submit this application.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -677,8 +695,9 @@ function RequestForm({
         description="Complete the request details below."
       />
       <PreviewNotice>
-        Fictional demo only. Submitting adds a sample request to this device&apos;s local history; no live employee system is contacted.
+        Review your details before submitting. The application will be saved to your account.
       </PreviewNotice>
+      {submissionError ? <Text style={styles.formValidationMessage}>{submissionError}</Text> : null}
 
       <Pressable
         accessibilityRole="button"
@@ -826,6 +845,8 @@ function RequestForm({
       <View style={[styles.formActions, width < 380 && styles.compactFormActions]}>
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ disabled: isSubmitting }}
+          disabled={isSubmitting}
           onPress={() => {
             setReviewing(false);
             onBack();
@@ -836,10 +857,12 @@ function RequestForm({
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ disabled: isSubmitting }}
+          disabled={isSubmitting}
           onPress={reviewing ? submitRequest : reviewRequest}
           style={({ pressed }) => [styles.primaryFormButton, pressed && styles.pressed]}
         >
-          <Text style={styles.primaryFormButtonText}>{reviewing ? 'Submit demo request' : 'Review request'}</Text>
+          <Text style={styles.primaryFormButtonText}>{isSubmitting ? 'Submitting…' : reviewing ? 'Submit application' : 'Review request'}</Text>
           <Text style={styles.continueArrow}>›</Text>
         </Pressable>
       </View>

@@ -1,12 +1,18 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useAuth } from '@/contexts/auth-context';
+import { demoEmployee } from '@/data/demo-data'; // add to your existing demo-data import
 import { ChoicePicker, EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoLeaveBalances, demoLoans, demoPayslip, demoProfileValues, formatDemoDate } from '@/data/demo-data';
+import { buildPayslipHtml, payslipFileName } from '@/data/payslip-html';
+import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { resolveIdentity } from '@/data/employee-records';
 
 const inquirySections = {
   'basic-profile': {
@@ -109,27 +115,79 @@ const loanTypes = [
   'Accountability Charges - Items',
 ];
 const payslipFields = [
-  'Payroll date',
-  'Pay period',
-  'Total earnings',
-  'Total deductions',
-  'Net income',
-  'YTD basic',
-  'YTD taxable',
-  'YTD tax withheld',
-  'Tax status',
-  'Position',
-  'Department',
+  'Payroll Date', 'Pay Period', 'Total Earnings', 'Total Deductions', 'Net Income',
+  'YTD Basic', 'YTD Taxable', 'YTD Tax Withheld', 'Tax Status', 'Position', 'Department',
 ];
 
+const payslipKeys = {
+  'Payroll Date': 'payrollDate',
+  'Pay Period': 'payPeriod',
+  'Total Earnings': 'totalEarnings',
+  'Total Deductions': 'totalDeductions',
+  'Net Income': 'netIncome',
+  'YTD Basic': 'ytdBasic',
+  'YTD Taxable': 'ytdTaxable',
+  'YTD Tax Withheld': 'ytdTaxWithheld',
+  'Tax Status': 'taxStatus',
+  Position: 'position',
+  Department: 'department',
+} as const;
+
+const earningsColumns = ['Description', 'Hours', 'Amount'];
+const deductionsColumns = ['Description', 'Amount', 'Balance'];
+
+
+
+
 export default function InquiryScreen() {
+  const { user } = useAuth();
+  const identity = resolveIdentity(user);
   const styles = useInquiryStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const { section: rawSection } = useLocalSearchParams<{ section: string }>();
   const section =
     rawSection && rawSection in inquirySections ? (rawSection as InquirySection) : undefined;
-  const [typeFilter, setTypeFilter] = useState('All');
+  const payPeriods = demoPayslip.map((slip) => slip.payPeriod); // newest fsirst
+const [payPeriod, setPayPeriod] = useState(payPeriods[0]);
+const selectedPayslip = demoPayslip.find((slip) => slip.payPeriod === payPeriod) ?? demoPayslip[0];
+const [printError, setPrintError] = useState('');
+
+const printPayslip = async () => {
+  setPrintError('');
+  const name = user?.displayName?.trim().toUpperCase();
+  const html = buildPayslipHtml(selectedPayslip, {
+  employeeName: `${identity.listName} (${identity.employeeCode})`,
+  employeeNameShort: identity.listName,
+});
+  const fileName = payslipFileName(selectedPayslip);
+  try {
+    if (Platform.OS === 'web') {
+      // Landscape comes from @page in the HTML; the tab title becomes the file name.
+      const win = window.open('', '_blank');
+      if (!win) throw new Error('Pop-up blocked');
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      win.print();
+      return;
+    }
+
+    // Phone: make a landscape A4 PDF, give it a proper name, then open the share sheet.
+    const { uri } = await Print.printToFileAsync({ html, width: 842, height: 595 });
+    const named = new File(Paths.cache, `${fileName}.pdf`);
+    if (named.exists) named.delete();
+    new File(uri).move(named);
+    await Sharing.shareAsync(named.uri, {
+      mimeType: 'application/pdf',
+      UTI: 'com.adobe.pdf',
+      dialogTitle: fileName,
+    });
+  } catch {
+    setPrintError('Could not create the pay slip. Allow pop-ups (web) and try again.');
+  }
+};
+const [typeFilter, setTypeFilter] = useState('All');
 
   if (!section) {
     return (
@@ -152,8 +210,13 @@ export default function InquiryScreen() {
           <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
             {profileFields.map((field) => (
               <View key={field} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
-                <Text style={styles.fieldLabel}>{field}</Text>
-                <Text style={styles.unavailable}>{demoProfileValues[field] ?? 'Sample record'}</Text>
+                <Text style={styles.unavailable}>
+                  {field === 'Employee name'
+                    ? identity.fullName
+                  : field === 'Employee code'
+                    ? identity.employeeCode
+                  : demoProfileValues[field] ?? 'Sample record'}
+</Text>
               </View>
             ))}
           </View>
@@ -188,25 +251,66 @@ export default function InquiryScreen() {
         </View>
       ) : null}
 
-      {section === 'pay-slip' ? (
-        <View>
-          <View style={styles.payPeriod}>
-            <Text style={styles.fieldLabel}>Payroll period</Text>
-            <Text style={styles.unavailable}>{demoPayslip.payPeriod}</Text>
+{section === 'pay-slip' ? (
+  <View>
+    <View style={styles.filter}>
+      <ChoicePicker
+        label="Pay period"
+        value={payPeriod}
+        options={payPeriods}
+        onChange={setPayPeriod}
+      />
+    </View>
+    <Pressable
+  accessibilityRole="button"
+  accessibilityLabel="Print pay slip"
+  onPress={printPayslip}
+  style={({ pressed }) => [styles.printButton, pressed && { opacity: 0.75 }]}
+>
+  <Text style={styles.printButtonText}>Print pay slip</Text>
+</Pressable>
+{printError ? <Text style={styles.printError}>{printError}</Text> : null}
+
+    <View style={[styles.payrollCard, width < 600 && styles.mobileCard]}>
+      <Text style={styles.cardTitle}>Payroll summary</Text>
+      <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
+        {payslipFields.map((field) => (
+          <View key={field} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
+            <Text style={styles.fieldLabel}>{field}</Text>
+            <Text style={styles.unavailable}>
+              {selectedPayslip[payslipKeys[field as keyof typeof payslipKeys]] || '—'}
+            </Text>
           </View>
-          <View style={[styles.payrollCard, width < 600 && styles.mobileCard]}>
-            <Text style={styles.cardTitle}>Payroll summary</Text>
-            <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
-              {payslipFields.map((field) => (
-                <View key={field} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
-                  <Text style={styles.fieldLabel}>{field}</Text>
-                <Text style={styles.unavailable}>{demoPayslip[field === 'Payroll date' ? 'payrollDate' : field === 'Pay period' ? 'payPeriod' : field === 'Total earnings' ? 'totalEarnings' : field === 'Total deductions' ? 'totalDeductions' : field === 'Net income' ? 'netIncome' : field === 'YTD basic' ? 'ytdBasic' : field === 'YTD taxable' ? 'ytdTaxable' : field === 'YTD tax withheld' ? 'ytdTaxWithheld' : field === 'Tax status' ? 'taxStatus' : field === 'Position' ? 'position' : 'department']}</Text>
-                </View>
-              ))}
-            </View>
+        ))}
+      </View>
+    </View>
+    <View style={[styles.payrollCard, width < 600 && styles.mobileCard]}>
+      <Text style={styles.cardTitle}>Earnings</Text>
+      <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
+        {selectedPayslip.earnings.map((row) => (
+          <View key={row.description} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
+            <Text style={styles.fieldLabel}>{row.description}</Text>
+            <Text style={styles.unavailable}>{row.amount}</Text>
+            <Text style={styles.fieldSubtext}>{row.hours} hours</Text>
           </View>
-        </View>
-      ) : null}
+        ))}
+      </View>
+    </View>
+
+    <View style={[styles.payrollCard, width < 600 && styles.mobileCard]}>
+      <Text style={styles.cardTitle}>Deductions</Text>
+      <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
+        {selectedPayslip.deductions.map((row) => (
+          <View key={row.description} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
+            <Text style={styles.fieldLabel}>{row.description}</Text>
+            <Text style={styles.unavailable}>{row.amount}</Text>
+            <Text style={styles.fieldSubtext}>Balance: {row.balance}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  </View>
+) : null}
     </PortalPage>
   );
 }
@@ -262,6 +366,17 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
+  printButton: {
+  alignSelf: 'flex-start',
+  minHeight: 44,
+  justifyContent: 'center',
+  marginBottom: 18,
+  paddingHorizontal: 18,
+  borderRadius: 4,
+  backgroundColor: RcsColors.brown,
+},
+printButtonText: { color: RcsColors.white, fontSize: 13, fontWeight: '700' },
+printError: { marginTop: -8, marginBottom: 14, color: RcsColors.danger, fontSize: 12 },
   mobileCard: { padding: 16, borderRadius: 4 },
   cardTitle: { marginBottom: 18, color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
   profileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -296,5 +411,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   tableHeading: { width: 116, paddingRight: 8, color: RcsColors.grayDark, fontSize: 11, fontWeight: '800' },
   tableRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
   tableCell: { width: 116, paddingRight: 8, color: RcsColors.text, fontSize: 11, lineHeight: 16 },
-  });
+  fieldSubtext: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 11 },  
+  
+});
 }

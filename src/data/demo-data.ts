@@ -484,19 +484,168 @@ export const demoLoans = [
   },
 ];
 
-export const demoPayslip = {
-  payrollDate: formatDemoDate(relativeDate(-1)),
-  payPeriod: "October 1–15, 2026 · Sample",
-  totalEarnings: "₱18,500.00",
-  totalDeductions: "₱3,240.00",
-  netIncome: "₱15,260.00",
-  ytdBasic: "₱185,000.00",
-  ytdTaxable: "₱168,400.00",
-  ytdTaxWithheld: "₱8,420.00",
-  position: demoEmployee.designation,
-  department: demoEmployee.department,
-  taxStatus: demoEmployee.taxStatus,
+export type DemoPayslip = {
+  payrollDate: string;
+  payPeriod: string;
+  totalEarnings: string;
+  totalDeductions: string;
+  netIncome: string;
+  ytdBasic: string;
+  ytdTaxable: string;
+  ytdTaxWithheld: string;
+  taxStatus: string;
+  position: string;
+  department: string;
+  company: string;
+  headOffice: string;
+  employeeName: string;
+  employeeNameShort: string;
+  payhouse: string;
+  payrollDateShort: string;
+  periodShort: string;
+  noOfHours: string;
+  noOfDays: string;
+  basicRate: string;
+  earnings: {
+    description: string;
+    hours: string;
+    days: string;
+    amount: string;
+  }[];
+  deductions: { description: string; amount: string; balance: string }[];
 };
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+const formatMoney = (value: number) =>
+  value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+function adjustForWeekend(date: Date) {
+  const day = date.getDay();
+  if (day === 6) date.setDate(date.getDate() - 1); // Saturday -> Friday
+  if (day === 0) date.setDate(date.getDate() - 2); // Sunday -> Friday
+  return date;
+}
+
+function buildDemoPayslips(count: number): DemoPayslip[] {
+  const BASIC_PAY = 9000;
+  const BASIC_HOURS = 96;
+  const TARDINESS_RATE = 78.5; // pay deducted per hour of tardiness
+  const deductionItems = [
+    { description: "SSS Payable", amount: 450 },
+    { description: "PhilHealth Payable", amount: 487.5 },
+    { description: "HDMF Payable", amount: 200 },
+  ];
+  const deductionsTotal = deductionItems.reduce(
+    (sum, item) => sum + item.amount,
+    0,
+  );
+
+  // Every half-month period for last year and this year, oldest first.
+  const periods: { start: Date; end: Date; payday: Date }[] = [];
+  for (const year of [todayStart.getFullYear() - 1, todayStart.getFullYear()]) {
+    for (let month = 0; month < 12; month += 1) {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      periods.push({
+        start: new Date(year, month, 1),
+        end: new Date(year, month, 15),
+        payday: adjustForWeekend(new Date(year, month, 20)),
+      });
+      periods.push({
+        start: new Date(year, month, 16),
+        end: new Date(year, month, lastDay),
+        payday: adjustForWeekend(new Date(year, month + 1, 5)),
+      });
+    }
+  }
+
+  const ytd: Record<number, { earnings: number; net: number }> = {};
+  const slips = periods
+    .filter((period) => period.payday <= todayStart) // only periods already paid
+    .map((period): DemoPayslip => {
+      const year = period.start.getFullYear();
+      const random = createDateRandom(`payslip-${dateKey(period.start)}`);
+      const tardinessHours = [0, 0.02, 0.05, 0.1, 0.25][
+        Math.floor(random() * 5)
+      ];
+      const tardiness = -round2(tardinessHours * TARDINESS_RATE);
+
+      const totalEarnings = round2(BASIC_PAY + tardiness);
+      const netIncome = round2(totalEarnings - deductionsTotal);
+      const running = ytd[year] ?? { earnings: 0, net: 0 };
+      running.earnings = round2(running.earnings + totalEarnings);
+      running.net = round2(running.net + netIncome);
+      ytd[year] = running;
+      const shortDate: Intl.DateTimeFormatOptions = {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      };
+      const longDate: Intl.DateTimeFormatOptions = {
+        month: "long",
+        day: "2-digit",
+        year: "numeric",
+      };
+      return {
+        payrollDate: formatDemoDate(dateKey(period.payday), {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }),
+        payPeriod: `${formatDemoDate(dateKey(period.start), longDate)} - ${formatDemoDate(dateKey(period.end), longDate)}`,
+        totalEarnings: formatMoney(totalEarnings),
+        totalDeductions: formatMoney(deductionsTotal),
+        netIncome: formatMoney(netIncome),
+        ytdBasic: formatMoney(running.earnings),
+        ytdTaxable: formatMoney(running.net),
+        ytdTaxWithheld: "",
+        taxStatus: "",
+        position: demoEmployee.designation,
+        department: demoEmployee.department,
+        company: demoEmployee.company.toUpperCase(),
+        headOffice: "000 DEMO HEAD OFFICE",
+        employeeName:
+          `${demoEmployee.lastName} , ${demoEmployee.firstName} ${demoEmployee.middleName.charAt(0)}. (${demoEmployee.employeeCode})`.toUpperCase(),
+        employeeNameShort:
+          `${demoEmployee.lastName} , ${demoEmployee.firstName} ${demoEmployee.middleName.charAt(0)}.`.toUpperCase(),
+        payhouse: "M00600",
+        payrollDateShort: formatDemoDate(dateKey(period.payday), shortDate),
+        periodShort: `${formatDemoDate(dateKey(period.start), shortDate)} to ${formatDemoDate(dateKey(period.end), shortDate)}`,
+        noOfHours: BASIC_HOURS.toFixed(2),
+        noOfDays: "12.00",
+        basicRate: "750.00",
+        earnings: [
+          {
+            description: "Basic Pay",
+            hours: BASIC_HOURS.toFixed(2),
+            days: "12.00",
+            amount: formatMoney(BASIC_PAY),
+          },
+          ...(tardinessHours > 0
+            ? [
+                {
+                  description: "UT/Tardiness",
+                  hours: tardinessHours.toFixed(2),
+                  days: "",
+                  amount: formatMoney(tardiness),
+                },
+              ]
+            : []),
+        ],
+        deductions: deductionItems.map((item) => ({
+          description: item.description,
+          amount: formatMoney(item.amount),
+          balance: "0.00",
+        })),
+      };
+    });
+
+  return slips.reverse().slice(0, count); // newest first
+}
+
+export const demoPayslip = buildDemoPayslips(4);
 
 export const demoAnnouncements = [
   {

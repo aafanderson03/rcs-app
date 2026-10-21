@@ -7,19 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
-import { useAuth } from '@/contexts/auth-context';
+import { isStandaloneDemoMode, useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
-import { demoEmployeeNames } from '@/data/demo-data';
-
-const demoUsers = [
-  { username: 'demo', name: demoEmployeeNames[0], company: 'RCS' },
-  { username: 'demo-brilliant', name: demoEmployeeNames[1], company: 'Brilliant' },
-  { username: 'demo-tlz', name: demoEmployeeNames[2], company: 'TLZ' },
-  { username: 'demo-fsi', name: demoEmployeeNames[3], company: 'Friendship' },
-  { username: 'demo-mfsc', name: demoEmployeeNames[4], company: 'Metro Federal Steel' },
-  { username: 'demo-cgci', name: demoEmployeeNames[5], company: 'Core Gateway Colleges' },
-  { username: 'demo-spf', name: demoEmployeeNames[6], company: 'Sweetpack Foods' },
-];
+import { DEMO_PASSWORD, demoAccounts } from '@/data/demo-accounts';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -67,21 +57,21 @@ export default function LoginScreen() {
           </View>
           <View style={[styles.card, isCompact && styles.compactCard]}>
           <Text style={styles.title}>Sign in</Text>
-          <Text style={styles.description}>Sign in with your employee account.</Text>
+          <Text style={styles.description}>{isStandaloneDemoMode ? 'Sign in with a sample demo account.' : 'Sign in with your employee account.'}</Text>
 
           <View style={styles.notice}>
-            <Text style={styles.noticeText}>Local prototype · Not connected to production systems</Text>
+            <Text style={styles.noticeText}>{isStandaloneDemoMode ? 'Standalone demo · Sample data is stored on this device' : 'Local prototype · Not connected to production systems'}</Text>
           </View>
-          {__DEV__ ? (
+          {__DEV__ || isStandaloneDemoMode ? (
             <View style={styles.demoCredentials}>
               <Text style={styles.demoCredentialsTitle}>Demo accounts</Text>
-              {demoUsers.map((demoUser) => (
+              {demoAccounts.map((demoUser) => (
                 <Text key={demoUser.username} style={styles.demoCredentialRow}>
-                  {demoUser.name} · {demoUser.company} — {demoUser.username}
+                  {demoUser.displayName} · {demoUser.companyLabel} — {demoUser.username}
                 </Text>
               ))}
               <Text style={styles.demoCredentialsHint}>
-                Shared demo password: demo1234. For local setup, AUTH_TEST_PASSWORD can be changed in .env.local.
+                Shared demo password: {DEMO_PASSWORD}.{isStandaloneDemoMode ? ' Sign-in works offline.' : ' For local setup, AUTH_TEST_PASSWORD can be changed in .env.local.'}
               </Text>
             </View>
           ) : null}

@@ -27,6 +27,16 @@ The authenticated account's company and employee type are returned by the server
 
 The local demo credentials work only while this development server is reachable. A published app cannot connect to your computer's `localhost`; deploy the auth API over HTTPS and set `EXPO_PUBLIC_AUTH_API_URL` to that hosted endpoint for the build. Never ship the local demo account or use real employee passwords with this prototype. The session token stays in memory and expires after eight hours.
 
+## Standalone offline demo APK
+
+The EAS `preview` profile enables a local-only demo login, so the APK can open the bundled sample screens without a computer or network connection. Build it with:
+
+```bash
+npx eas-cli@latest build --platform android --profile preview
+```
+
+Use one of the demo usernames shown on the sign-in screen. All use the password `demo1234`. Sample records are bundled with the app; demo submissions are saved only on that device. This mode is for presentations and is not connected to employee accounts or production data. The `production` profile does not enable offline demo sign-in.
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)

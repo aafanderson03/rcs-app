@@ -1,18 +1,17 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { useAuth } from '@/contexts/auth-context';
-import { demoEmployee } from '@/data/demo-data'; // add to your existing demo-data import
 import { ChoicePicker, EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoLeaveBalances, demoLoans, demoPayslip, demoProfileValues, formatDemoDate } from '@/data/demo-data';
+import { resolveIdentity } from '@/data/employee-records';
 import { buildPayslipHtml, payslipFileName } from '@/data/payslip-html';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
+import { useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { resolveIdentity } from '@/data/employee-records';
+import { useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 const inquirySections = {
   'basic-profile': {
@@ -133,12 +132,6 @@ const payslipKeys = {
   Department: 'department',
 } as const;
 
-const earningsColumns = ['Description', 'Hours', 'Amount'];
-const deductionsColumns = ['Description', 'Amount', 'Balance'];
-
-
-
-
 export default function InquiryScreen() {
   const { user } = useAuth();
   const identity = resolveIdentity(user);
@@ -155,7 +148,6 @@ const [printError, setPrintError] = useState('');
 
 const printPayslip = async () => {
   setPrintError('');
-  const name = user?.displayName?.trim().toUpperCase();
   const html = buildPayslipHtml(selectedPayslip, {
   employeeName: `${identity.listName} (${identity.employeeCode})`,
   employeeNameShort: identity.listName,
@@ -206,17 +198,19 @@ const [typeFilter, setTypeFilter] = useState('All');
 
       {section === 'basic-profile' ? (
         <View style={[styles.profileCard, width < 600 && styles.mobileCard]}>
+          
           <Text style={styles.cardTitle}>Employee information</Text>
           <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
             {profileFields.map((field) => (
               <View key={field} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
+                  <Text style={styles.fieldLabel}>{field}</Text>
                 <Text style={styles.unavailable}>
                   {field === 'Employee name'
                     ? identity.fullName
                   : field === 'Employee code'
                     ? identity.employeeCode
                   : demoProfileValues[field] ?? 'Sample record'}
-</Text>
+                </Text>
               </View>
             ))}
           </View>
@@ -321,8 +315,8 @@ function DataTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
   return (
     <View style={styles.tableCard}>
       {width < 600 ? <Text style={styles.tableHint}>Swipe sideways to view all columns</Text> : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator>
-        <View style={[styles.tableContent, { minWidth: columns.length * 116 }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.tableScroll}>
+  <View style={[styles.tableContent, { minWidth: columns.length * 125 }]}>
           <View style={styles.tableHeader}>
             {columns.map((column) => <Text key={column} style={styles.tableHeading}>{column}</Text>)}
           </View>
@@ -342,15 +336,6 @@ function useInquiryStyles() {
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   filter: { maxWidth: 380, marginBottom: 18, zIndex: 10, elevation: 10 },
-  payPeriod: {
-    maxWidth: 480,
-    padding: 15,
-    marginBottom: 18,
-    borderRadius: 4,
-    backgroundColor: RcsColors.surface,
-    borderWidth: 1,
-    borderColor: RcsColors.border,
-  },
   profileCard: {
     padding: 24,
     borderRadius: 4,
@@ -389,9 +374,14 @@ printError: { marginTop: -8, marginBottom: 14, color: RcsColors.danger, fontSize
     borderRadius: 4,
     backgroundColor: RcsColors.background,
   },
-  desktopProfileItem: { flexBasis: '48%', minWidth: 200 },
+  desktopProfileItem: { flexBasis: '45%', minWidth: 200 },
   fieldLabel: { color: RcsColors.grayMuted, fontSize: 11, fontWeight: '700' },
   unavailable: { marginTop: 7, color: RcsColors.grayMuted, fontSize: 13 },
+  
+  tableScroll: { flexGrow: 1 },
+tableContent: { flexGrow: 1, paddingBottom: 3 },
+tableHeading: { flex: 1, minWidth: 125, paddingRight: 8, color: RcsColors.grayDark, fontSize: 15, fontWeight: '700', alignSelf: 'center' },
+tableCell: { flex: 1, minWidth: 125, paddingRight: 8, color: RcsColors.text, fontSize: 14, lineHeight: 16 },
   tableCard: {
     padding: 16,
     borderRadius: 4,
@@ -402,15 +392,12 @@ printError: { marginTop: -8, marginBottom: 14, color: RcsColors.danger, fontSize
   tableHint: { marginBottom: 10, color: RcsColors.grayMuted, fontSize: 11 },
   tableHeader: {
     flexDirection: 'row',
-    paddingBottom: 14,
-    marginBottom: 14,
+    paddingBottom: 10,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: RcsColors.border,
   },
-  tableContent: { paddingBottom: 3 },
-  tableHeading: { width: 116, paddingRight: 8, color: RcsColors.grayDark, fontSize: 11, fontWeight: '800' },
-  tableRow: { flexDirection: 'row', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
-  tableCell: { width: 116, paddingRight: 8, color: RcsColors.text, fontSize: 11, lineHeight: 16 },
+  tableRow: { flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
   fieldSubtext: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 11 },  
   
 });

@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import { DEMO_PASSWORD, demoAccounts } from '@/data/demo-accounts';
 
 export type EmployeeType = 'employee' | 'merchandiser' | 'guard' | 'subcontractor';
 export type Company = { slug: string; name: string };
@@ -22,6 +23,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const configuredApiUrl = process.env.EXPO_PUBLIC_AUTH_API_URL;
+export const isStandaloneDemoMode = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 function getAuthApiUrl() {
   const isAndroidEmulator = Platform.OS === 'android' && !Device.isDevice;
@@ -74,6 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     token,
     async signIn(username, password) {
+      if (isStandaloneDemoMode) {
+        const account = demoAccounts.find((candidate) => candidate.username === username.trim().toLowerCase());
+        if (!account || password !== DEMO_PASSWORD) throw new Error('Demo sign-in failed. Check the demo username and password.');
+        setToken(null);
+        setUser(account.user);
+        return account.user;
+      }
+
       const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

@@ -161,20 +161,21 @@ export default function HomeScreen() {
   ];
   const selectedKey = selectedDate ? dateKey(selectedDate) : '';
   const todayKey = dateKey(today);
-  const upcomingHolidays = [...getHolidays(today.getFullYear()), ...getHolidays(today.getFullYear() + 1)]
-    .filter((holiday) => holiday.date >= todayKey)
-    .slice(0, 5);
   const milestones = getDemoMilestones(today);
-  const milestoneCount = isWide ? 12 : isDesktop ? 6 : 5;
-  const calendarEvents = [
-    ...holidays
-      .filter((holiday) => holiday.date === selectedKey)
+  // Events (holidays, payday, requests) for any date key
+  const todayHolidays = [...getHolidays(today.getFullYear()), ...getHolidays(today.getFullYear() + 1)];
+  const todayPaydays = paydaysAround(today).map(dateKey);
+  const eventsFor = (key: string) => [
+    ...[...holidays, ...todayHolidays]
+      .filter((holiday, i, all) => holiday.date === key && all.findIndex((h) => h.date === holiday.date && h.name === holiday.name) === i)
       .map((holiday) => ({ label: holiday.name, note: `${holiday.scope} holiday` })),
-    ...(paydays.includes(selectedKey) ? [{ label: 'Payday', note: '' }] : []),
+    ...(paydays.includes(key) || todayPaydays.includes(key) ? [{ label: 'Payday', note: '' }] : []),
     ...applications
-      .filter((item) => item.submittedAt === selectedKey)
+      .filter((item) => item.submittedAt === key)
       .map((item) => ({ label: `${item.type} request`, note: item.status })),
   ];
+  const calendarEvents = eventsFor(selectedKey);
+  const selectedIsToday = selectedKey === todayKey;
 
   const summaryLine = [
     pendingCount > 0
@@ -382,6 +383,9 @@ export default function HomeScreen() {
                   ? formatDemoDate(selectedKey, { weekday: 'long', month: 'long', day: 'numeric' })
                   : 'Select a date'}
               </Text>
+              {selectedDate ? (
+                <Text style={styles.eventsHeading}>{selectedIsToday ? "Today's Events" : 'Events'}</Text>
+              ) : null}
               {selectedDate && !calendarEvents.length ? (
                 <Text style={styles.eventsEmpty}>Nothing scheduled.</Text>
               ) : null}
@@ -390,19 +394,6 @@ export default function HomeScreen() {
                   <View style={styles.eventDot} />
                   <Text style={styles.eventLabel}>{event.label}</Text>
                   {event.note ? <Text style={styles.eventNote}>{event.note}</Text> : null}
-                </View>
-              ))}
-              <Text style={styles.holidaysTitle}>Upcoming holidays</Text>
-              {upcomingHolidays.map((holiday, index) => (
-                <View key={`${holiday.date}-${holiday.name}`} style={[styles.holidayRow, index > 0 && styles.holidayDivider]}>
-                  <View style={styles.holidayDate}>
-                    <Text style={styles.holidayDay}>{Number(holiday.date.slice(8, 10))}</Text>
-                    <Text style={styles.holidayMonth}>{formatDemoDate(holiday.date, { month: 'short' })}</Text>
-                  </View>
-                  <View style={styles.holidayCopy}>
-                    <Text style={styles.holidayName}>{holiday.name}</Text>
-                    <Text style={styles.holidayKind}>{holiday.scope} · {holiday.kind}</Text>
-                  </View>
                 </View>
               ))}
             </View>
@@ -420,7 +411,7 @@ export default function HomeScreen() {
                 <MilestoneGroup
                   title="Birthdays"
                   styles={styles}
-                  items={milestones.birthdays.slice(0, milestoneCount).map((m) => ({ name: m.name, note: m.date, past: m.past }))}
+                  items={milestones.birthdays.map((m) => ({ name: m.name, note: m.date, past: m.past }))}
                 />
               </View>
               <View style={[styles.milestoneDivider, isWide && styles.milestoneDividerVertical]} />
@@ -428,7 +419,7 @@ export default function HomeScreen() {
                 <MilestoneGroup
                   title="Work Anniversaries"
                   styles={styles}
-                  items={milestones.anniversaries.slice(0, milestoneCount).map((m) => ({
+                  items={milestones.anniversaries.map((m) => ({
                     name: m.name,
                     note: `${m.years} yr${m.years === 1 ? '' : 's'} · ${m.date}`,
                     past: m.past,
@@ -498,15 +489,21 @@ function MilestoneGroup({
   return (
     <View>
       <Text style={styles.milestoneTitle}>{title}</Text>
-      {items.map((item) => (
-        <View key={item.name} style={[styles.milestoneRow, item.past && styles.milestonePast]}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials(item.name)}</Text>
+      <ScrollView
+        style={styles.milestoneScroll}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+      >
+        {items.map((item) => (
+          <View key={item.name} style={[styles.milestoneRow, item.past && styles.milestonePast]}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials(item.name)}</Text>
+            </View>
+            <Text style={styles.milestoneName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.milestoneNote}>{item.note}</Text>
           </View>
-          <Text style={styles.milestoneName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.milestoneNote}>{item.note}</Text>
-        </View>
-      ))}
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -613,6 +610,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   cardActionArrow: { marginLeft: 7, color: colors.brown, fontSize: 15 },
 
   milestoneTitle: { marginBottom: 6, color: colors.text, fontSize: 13, fontWeight: '700' },
+  milestoneScroll: { maxHeight: 400 },
   milestoneRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.yellowLight },
   avatarText: { color: colors.brown, fontSize: 10, fontWeight: '800' },
@@ -658,6 +656,11 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     borderColor: colors.border,
   },
   eventsDate: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  eventsHeading: { marginTop: 4, color: colors.brown, fontSize: 10, fontWeight: '800', letterSpacing: 0.9, textTransform: 'uppercase' },
+  eventsSpacer: { height: 24 },
+  upcomingDay: { paddingVertical: 10 },
+  upcomingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  upcomingTitle: { color: colors.text, fontSize: 12, fontWeight: '700' },
   eventsEmpty: { marginTop: 6, color: colors.grayMuted, fontSize: 12 },
   eventRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   eventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brown },

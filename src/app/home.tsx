@@ -516,12 +516,12 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   // Hero banner
   heroWrap: { marginBottom: 16, zIndex: 20, elevation: 20 },
   desktopHeroWrap: { marginBottom: 20 },
-  bellSlot: { position: 'absolute', top: 14, right: 14, zIndex: 30, elevation: 30 },
+  bellSlot: { position: 'absolute', top: 20, right: 20, zIndex: 30, elevation: 30 },
   hero: { padding: 22, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   desktopHero: { padding: 34 },
   introMeta: { paddingRight: 56, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   heroEyebrow: { color: '#7A2E24', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  heroDate: { color: 'rgba(43,33,24,0.7)', fontSize: 12, fontWeight: '600' },
+  heroDate: { color: 'rgba(0, 0, 0, 1)', fontSize: 12, fontWeight: '700' },
   heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 28, fontWeight: '700', letterSpacing: -0.6 },
   desktopHeroTitle: { fontSize: 38, letterSpacing: -1 },
   heroSummary: { maxWidth: 620, marginTop: 8, color: 'rgba(43,33,24,0.85)', fontSize: 14, lineHeight: 21 },
@@ -610,7 +610,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   cardActionArrow: { marginLeft: 7, color: colors.brown, fontSize: 15 },
 
   milestoneTitle: { marginBottom: 6, color: colors.text, fontSize: 13, fontWeight: '700' },
-  milestoneScroll: { maxHeight: 400 },
+  milestoneScroll: { maxHeight: 400, paddingRight: 4 },
   milestoneRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.yellowLight },
   avatarText: { color: colors.brown, fontSize: 10, fontWeight: '800' },

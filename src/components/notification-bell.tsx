@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme } from '@/constants/theme';
@@ -13,12 +13,7 @@ const SEEN_KEY = 'rcs-seen-notifications';
 
 type Notice = { id: string; title: string; detail: string; date: string; route: string };
 
-/**
- * Bell with an unread badge. Notices are built from your demo data:
- * requests that were approved/disapproved in the last 14 days, and announcements from the
- * last 7 days. Opening the bell shows them; closing it marks them as read (saved on device).
- * Place it inside a positioned wrapper, e.g. { position: 'absolute', top: 14, right: 14 }.
- */
+
 export function NotificationBell() {
   const router = useRouter();
   const { applications } = useDemoSubmissions();
@@ -97,7 +92,10 @@ export function NotificationBell() {
         onPress={() => (open ? close() : setOpen(true))}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >
-        <Text style={styles.bell}>🔔</Text>
+        <Image 
+          source={require('../../assets/images/bell.png')} 
+          style={styles.bellImage} 
+        />
         {unreadIds.length ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{unreadIds.length > 9 ? '9+' : unreadIds.length}</Text>
@@ -145,20 +143,24 @@ export function NotificationBell() {
 const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
   wrap: { alignItems: 'flex-end' },
   button: {
-    width: 44,
-    height: 44,
+    width: 50,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderWidth: 1,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    borderWidth: 3,
     borderColor: colors.border,
   },
-  bell: { fontSize: 19 },
+  bellImage: { 
+    width: 20, 
+    height: 20,
+    resizeMode: 'contain',
+   },
   badge: {
     position: 'absolute',
-    top: -3,
-    right: -3,
+    top: -2,
+    right: -2,
     minWidth: 18,
     height: 18,
     alignItems: 'center',

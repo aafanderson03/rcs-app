@@ -193,8 +193,8 @@ function useDashboardStyles() {
   const { colorScheme } = useAppTheme();
   const palette = getPaletteForScheme(colorScheme);
   const styles = useMemo(() => createStyles(palette), [palette]);
-  // Pending and Approved reuse your theme colors. Disapproved uses a muted red and
-  // Cancelled uses your muted gray. Swap in theme tokens if you have them.
+
+  
   const statusColors: Record<TrackedStatus, string> = useMemo(
     () => ({
       Pending: palette.yellowDeep,

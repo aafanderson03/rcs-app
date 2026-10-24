@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-
+import { NotificationBell } from '@/components/notification-bell';
 import { DesktopSidebar } from '@/components/desktop-sidebar';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
@@ -22,8 +22,8 @@ import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
 import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 
-const SPLASH_HOLD_DURATION_MS = 3000;
-const SPLASH_FADE_DURATION_MS = 500;
+const SPLASH_HOLD_DURATION_MS = 750;
+const SPLASH_FADE_DURATION_MS = 250;
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch((error: unknown) => {
@@ -190,6 +190,9 @@ function RootLayoutContent() {
                   )}
                 </Pressable>
               </View>
+              <View style={styles.bellSlot}>
+          <NotificationBell />
+        </View>
               <View style={styles.themeControl}>
                 <Pressable
                   accessibilityRole="button"
@@ -273,6 +276,8 @@ function RootLayoutContent() {
                 />
               </Animated.View>
             </Animated.View>
+
+        
           ) : null}
         </SafeAreaView>
       </SafeAreaProvider>
@@ -311,6 +316,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   brandSubtitle: { color: colors.grayMuted, fontSize: 12 },
   mobileBrandName: { flexShrink: 1, minWidth: 0, marginLeft: 8, color: colors.brownDark, fontSize: 12, fontWeight: '700' },
   brandPressed: { opacity: 0.75 },
+  bellSlot: { position: 'absolute', top: 20, right: 125, zIndex: 30, elevation: 30 },
   menuButton: {
     width: 44,
     height: 44,

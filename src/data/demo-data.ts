@@ -1,3 +1,37 @@
+import {
+  DAILY_RATE,
+  HOURS_PER_DAY,
+  WORK_DAYS_PER_MONTH,
+  amountForCutoff,
+  pagIbigEmployeeShare,
+  philHealthEmployeeShare,
+  round2,
+  sssEmployeeShare,
+  tardinessDeduction,
+} from "@/data/payroll";
+
+export const LATE_SANCTION_LADDER = [
+  "1-day suspension",
+  "3-day suspension",
+  "7-day suspension", // confirm this one
+  "Termination",
+] as const;
+
+export function getLateSanction(offenseNumber: number) {
+  const index = Math.min(offenseNumber, LATE_SANCTION_LADDER.length) - 1;
+  return LATE_SANCTION_LADDER[Math.max(0, index)];
+}
+
+// Allowed durations. Anything over these counts as lateness.
+export const ALLOWED_LUNCH_MINUTES = 70; // 1 hour 10 minutes
+export const ALLOWED_BREAK_MINUTES = 30;
+
+// How often the simulated employee is late (chance per workday).
+// Raise these for more lates, lower them for fewer.
+const LATE_ARRIVAL_CHANCE = 0.12;
+const LATE_LUNCH_CHANCE = 0.06;
+const LATE_BREAK_CHANCE = 0.06;
+
 export type DemoPunch = {
   direction: "IN" | "OUT";
   label:
@@ -12,8 +46,12 @@ export type DemoPunch = {
 
 export type DemoAttendanceRecord = {
   date: string;
-  status: "Present" | "Late";
-  lateByMinutes: number;
+  // "SIL" = paid absence (Service Incentive Leave), "LWOP" = unpaid absence
+  status: "Present" | "Late" | "SIL" | "LWOP";
+  lateByMinutes: number; // arrival lateness only
+  lunchOverMinutes: number; // minutes past the allowed lunch
+  breakOverMinutes: number; // minutes past the allowed afternoon break
+  totalLateMinutes: number; // arrival + lunch + break
   scheduledShift: string;
   shiftSpanMinutes: number;
   unpaidLunchMinutes: number;
@@ -28,6 +66,7 @@ export type DemoMonthlyLateSummary = {
   lateDays: number;
   lateMinutes: number;
   sanctionThresholdReached: boolean;
+  sanction: string | null;
 };
 
 export type DemoApprover = {
@@ -61,6 +100,70 @@ export function dateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+export function isRestDay(date: Date) {
+  return date.getDay() === 0; // Sunday
+}
+
+// Simulated absences: one day in each listed month (0 = January).
+// SIL stays under the 5-day yearly allowance (at most 4 a year).
+const SIL_MONTHS = [1, 4, 7, 9]; // Feb, May, Aug, Oct
+const LWOP_MONTHS = [0, 2, 5, 8, 9]; // Jan, Mar, Jun, Sep, Oct
+
+// Picks a workday (3rd–26th, never a Sunday) for the month's absence.
+function pickAbsenceDay(year: number, month: number, kind: string, avoid?: number) {
+  const random = createDateRandom(`absence-${kind}-${year}-${month}`);
+  let day = 3 + Math.floor(random() * 22);
+  while (new Date(year, month, day).getDay() === 0 || day === avoid) day += 1;
+  return day;
+}
+
+function silDayFor(year: number, month: number) {
+  return SIL_MONTHS.includes(month) ? pickAbsenceDay(year, month, "sil") : null;
+}
+
+function getAbsenceType(date: Date): "SIL" | "LWOP" | null {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const silDay = silDayFor(year, month);
+  const lwopDay = LWOP_MONTHS.includes(month)
+    ? pickAbsenceDay(year, month, "lwop", silDay ?? undefined)
+    : null;
+  if (date.getDate() === silDay) return "SIL";
+  if (date.getDate() === lwopDay) return "LWOP";
+  return null;
+}
+
+// SIL days already taken this year (used for the leave balance).
+function silDaysUsedThisYear() {
+  const year = todayStart.getFullYear();
+  let used = 0;
+  for (const month of SIL_MONTHS) {
+    const day = silDayFor(year, month);
+    if (day && new Date(year, month, day) < todayStart) used += 1;
+  }
+  return used;
+}
+
+function buildAbsenceRecord(key: string, absence: "SIL" | "LWOP"): DemoAttendanceRecord {
+  const shiftSpanMinutes = 17 * 60 + 30 - (8 * 60 + 30);
+  return {
+    date: key,
+    status: absence,
+    lateByMinutes: 0,
+    lunchOverMinutes: 0,
+    breakOverMinutes: 0,
+    totalLateMinutes: 0,
+    scheduledShift: "8:30 AM – 5:30 PM",
+    shiftSpanMinutes,
+    unpaidLunchMinutes: ALLOWED_LUNCH_MINUTES,
+    paidBreakMinutes: ALLOWED_BREAK_MINUTES,
+    scheduledPaidMinutes: 8 * 60,
+    paidMinutes: absence === "SIL" ? 8 * 60 : 0, // SIL is paid, LWOP is not
+    punches: [],
+    totalWorked: formatWorkedTime(0),
+  };
 }
 
 export function relativeDate(daysFromToday: number) {
@@ -189,34 +292,54 @@ export const demoEmployee = {
   company: "RCS Demo Retail Corporation",
 };
 
-export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
+function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
   const key = dateKey(date);
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const weekday = new Date(
-    Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()),
-  ).getUTCDay();
-  if (start >= todayStart || weekday === 0) return null;
-  if (todayStart.getTime() - start.getTime() > 35 * 24 * 60 * 60 * 1000)
-    return null;
+  if (start >= todayStart || isRestDay(start)) return null;
+
+  const absence = getAbsenceType(start);
+  if (absence) return buildAbsenceRecord(key, absence);
 
   const random = createDateRandom(key);
-  const clockIn = 8 * 60 + 25 + Math.floor(random() * 21);
-  const lunchIn = 11 * 60 + Math.floor(random() * 61);
-  const lunchOut = lunchIn + 70;
+  // Roughly 1 in 8 arrivals is late (1–10 min); otherwise 8:20–8:30 AM.
+  const clockIn =
+    random() < LATE_ARRIVAL_CHANCE
+      ? 8 * 60 + 31 + Math.floor(random() * 10)
+      : 8 * 60 + 20 + Math.floor(random() * 11);
+  const lunchOut = 11 * 60 + Math.floor(random() * 61); // leaves for lunch
   const afternoonBreakOut = 15 * 60 + 1 + Math.floor(random() * 90);
-  const afternoonBreakIn = afternoonBreakOut + 30;
+  // Lunch is usually 62–70 min; occasionally runs 1–5 min over the allowed 70.
+  const lunchDuration =
+    random() < LATE_LUNCH_CHANCE
+      ? ALLOWED_LUNCH_MINUTES + 1 + Math.floor(random() * 5)
+      : ALLOWED_LUNCH_MINUTES - 8 + Math.floor(random() * 9);
+  // Break is usually 25–30 min; occasionally runs 1–4 min over the allowed 30.
+  const breakDuration =
+    random() < LATE_BREAK_CHANCE
+      ? ALLOWED_BREAK_MINUTES + 1 + Math.floor(random() * 4)
+      : ALLOWED_BREAK_MINUTES - 5 + Math.floor(random() * 6);
+  const lunchIn = lunchOut + lunchDuration; // returns from lunch
+  const afternoonBreakIn = afternoonBreakOut + breakDuration;
   const clockOut = 17 * 60 + 30;
+
   const lateByMinutes = Math.max(0, clockIn - (8 * 60 + 30));
+  const lunchOverMinutes = Math.max(0, lunchDuration - ALLOWED_LUNCH_MINUTES);
+  const breakOverMinutes = Math.max(0, breakDuration - ALLOWED_BREAK_MINUTES);
+  const totalLateMinutes = lateByMinutes + lunchOverMinutes + breakOverMinutes;
+
   const shiftSpanMinutes = clockOut - (8 * 60 + 30);
-  const unpaidLunchMinutes = lunchOut - lunchIn;
-  const paidBreakMinutes = afternoonBreakIn - afternoonBreakOut;
-  const scheduledPaidMinutes = shiftSpanMinutes - unpaidLunchMinutes;
-  const paidMinutes = clockOut - clockIn - unpaidLunchMinutes;
+  const unpaidLunchMinutes = ALLOWED_LUNCH_MINUTES;
+  const paidBreakMinutes = ALLOWED_BREAK_MINUTES;
+  const scheduledPaidMinutes = 8 * 60; // paid day is 8 hours
+  const paidMinutes = scheduledPaidMinutes - totalLateMinutes;
 
   return {
     date: key,
-    status: lateByMinutes > 0 ? "Late" : "Present",
+    status: totalLateMinutes > 0 ? "Late" : "Present",
     lateByMinutes,
+    lunchOverMinutes,
+    breakOverMinutes,
+    totalLateMinutes,
     scheduledShift: "8:30 AM – 5:30 PM",
     shiftSpanMinutes,
     unpaidLunchMinutes,
@@ -225,8 +348,8 @@ export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
     paidMinutes,
     punches: [
       { direction: "IN", label: "Check in", time: formatPunchTime(clockIn) },
-      { direction: "OUT", label: "Lunch out", time: formatPunchTime(lunchIn) },
-      { direction: "IN", label: "Lunch in", time: formatPunchTime(lunchOut) },
+      { direction: "OUT", label: "Lunch out", time: formatPunchTime(lunchOut) },
+      { direction: "IN", label: "Lunch in", time: formatPunchTime(lunchIn) },
       {
         direction: "OUT",
         label: "Afternoon break out",
@@ -243,6 +366,21 @@ export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
   };
 }
 
+// The attendance screen only looks back 35 days.
+export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (todayStart.getTime() - start.getTime() > 35 * 24 * 60 * 60 * 1000)
+    return null;
+  return buildDemoAttendance(date);
+}
+
+// Payroll needs the same simulated punches for a whole pay period, however old.
+export function getDemoAttendanceForPayroll(
+  date: Date,
+): DemoAttendanceRecord | null {
+  return buildDemoAttendance(date);
+}
+
 export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -252,19 +390,26 @@ export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
   );
   let lateDays = 0;
   let lateMinutes = 0;
+  let offenseNumber = 0;
 
   for (let day = 1; day <= finalDay; day += 1) {
     const record = getDemoAttendance(new Date(year, month, day));
-    if (record && record.lateByMinutes > 0) {
+    if (record && record.totalLateMinutes > 0) {
       lateDays += 1;
-      lateMinutes += record.lateByMinutes;
+      lateMinutes += record.totalLateMinutes;
+      // The late day that reaches the threshold (12 late days or 120 minutes)
+      // is offense 1 (1-day suspension). Every later late day is the next
+      // step: 3-day, 7-day, termination.
+      if (lateDays >= 12 || lateMinutes >= 120) offenseNumber += 1;
     }
   }
 
+  const reached = lateDays >= 12 || lateMinutes >= 120;
   return {
     lateDays,
     lateMinutes,
-    sanctionThresholdReached: lateDays >= 12 || lateMinutes >= 120,
+    sanctionThresholdReached: reached,
+    sanction: offenseNumber > 0 ? getLateSanction(offenseNumber) : null,
   };
 }
 
@@ -273,7 +418,8 @@ export function getRecentDemoAttendance() {
     const date = new Date(todayStart);
     date.setDate(date.getDate() - daysAgo);
     const record = getDemoAttendance(date);
-    if (record) return record;
+    // Skip absences: the "last workday" card should show a day that has punches.
+    if (record && record.punches.length > 0) return record;
   }
   return null;
 }
@@ -458,7 +604,7 @@ export const demoLeaveBalances = [
   },
   {
     type: "Service Incentive Leave",
-    used: "0.0",
+    used: silDaysUsedThisYear().toFixed(1),
     total: "5.0",
     from: "2026-01-01",
     to: "2026-12-31",
@@ -515,7 +661,6 @@ export type DemoPayslip = {
   deductions: { description: string; amount: string; balance: string }[];
 };
 
-const round2 = (value: number) => Math.round(value * 100) / 100;
 const formatMoney = (value: number) =>
   value.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -530,18 +675,14 @@ function adjustForWeekend(date: Date) {
 }
 
 function buildDemoPayslips(count: number): DemoPayslip[] {
-  const BASIC_PAY = 9000;
-  const BASIC_HOURS = 96;
-  const TARDINESS_RATE = 78.5; // pay deducted per hour of tardiness
-  const deductionItems = [
-    { description: "SSS Payable", amount: 450 },
-    { description: "PhilHealth Payable", amount: 487.5 },
-    { description: "HDMF Payable", amount: 200 },
-  ];
-  const deductionsTotal = deductionItems.reduce(
-    (sum, item) => sum + item.amount,
-    0,
-  );
+  // Government contributions are based on the monthly basic salary (daily rate x working days),
+  // then taken from the two monthly pay slips according to CONTRIBUTION_SCHEDULE.
+  const monthlyBasic = DAILY_RATE * WORK_DAYS_PER_MONTH;
+  const monthly = {
+    sss: sssEmployeeShare(monthlyBasic),
+    philHealth: philHealthEmployeeShare(monthlyBasic),
+    pagIbig: pagIbigEmployeeShare(monthlyBasic),
+  };
 
   // Every half-month period for last year and this year, oldest first.
   const periods: { start: Date; end: Date; payday: Date }[] = [];
@@ -561,33 +702,84 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
     }
   }
 
+  const shortDate: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  };
+  const longDate: Intl.DateTimeFormatOptions = {
+    month: "long",
+    day: "2-digit",
+    year: "numeric",
+  };
+
   const ytd: Record<number, { earnings: number; net: number }> = {};
   const slips = periods
     .filter((period) => period.payday <= todayStart) // only periods already paid
     .map((period): DemoPayslip => {
       const year = period.start.getFullYear();
-      const random = createDateRandom(`payslip-${dateKey(period.start)}`);
-      const tardinessHours = [0, 0.02, 0.05, 0.1, 0.25][
-        Math.floor(random() * 5)
-      ];
-      const tardiness = -round2(tardinessHours * TARDINESS_RATE);
+      const cutoff: 1 | 2 = period.start.getDate() === 1 ? 1 : 2;
 
-      const totalEarnings = round2(BASIC_PAY + tardiness);
-      const netIncome = round2(totalEarnings - deductionsTotal);
+      // Days worked and late minutes come from the simulated attendance punches
+      let daysWorked = 0;
+      let silDays = 0; // paid absences (Service Incentive Leave)
+      let lwopDays = 0; // unpaid absences (leave without pay)
+      let lateMinutes = 0;
+      for (
+        const day = new Date(period.start);
+        day <= period.end;
+        day.setDate(day.getDate() + 1)
+      ) {
+        const record = getDemoAttendanceForPayroll(new Date(day));
+        if (!record) continue;
+        if (record.status === "LWOP") {
+          lwopDays += 1;
+          continue;
+        }
+        if (record.status === "SIL") {
+          silDays += 1;
+          continue;
+        }
+        daysWorked += 1;
+        lateMinutes += record.totalLateMinutes;
+      }
+
+      // Basic Pay covers every scheduled workday except paid leave (SIL has its
+      // own line). Unpaid absences (LWOP) are then taken back out as a deduction.
+      const basicDays = daysWorked + lwopDays;
+      const regularHours = basicDays * HOURS_PER_DAY;
+      const basicPay = round2(regularHours * (DAILY_RATE / HOURS_PER_DAY));
+      const silPay = round2(silDays * DAILY_RATE);
+      const lwopPay = -round2(lwopDays * DAILY_RATE);
+      const paidDays = daysWorked + silDays;
+      const tardiness = -tardinessDeduction(lateMinutes);
+      const tardinessHours = lateMinutes / 60;
+      const totalEarnings = round2(basicPay + silPay + lwopPay + tardiness);
+
+      const deductionItems = [
+        {
+          description: "SSS Payable",
+          amount: amountForCutoff(monthly.sss, cutoff),
+        },
+        {
+          description: "PhilHealth Payable",
+          amount: amountForCutoff(monthly.philHealth, cutoff),
+        },
+        {
+          description: "HDMF Payable",
+          amount: amountForCutoff(monthly.pagIbig, cutoff),
+        },
+      ];
+      const totalDeductions = round2(
+        deductionItems.reduce((sum, item) => sum + item.amount, 0),
+      );
+      const netIncome = round2(totalEarnings - totalDeductions);
+
       const running = ytd[year] ?? { earnings: 0, net: 0 };
       running.earnings = round2(running.earnings + totalEarnings);
       running.net = round2(running.net + netIncome);
       ytd[year] = running;
-      const shortDate: Intl.DateTimeFormatOptions = {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-      };
-      const longDate: Intl.DateTimeFormatOptions = {
-        month: "long",
-        day: "2-digit",
-        year: "numeric",
-      };
+
       return {
         payrollDate: formatDemoDate(dateKey(period.payday), {
           month: "long",
@@ -596,7 +788,7 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
         }),
         payPeriod: `${formatDemoDate(dateKey(period.start), longDate)} - ${formatDemoDate(dateKey(period.end), longDate)}`,
         totalEarnings: formatMoney(totalEarnings),
-        totalDeductions: formatMoney(deductionsTotal),
+        totalDeductions: formatMoney(totalDeductions),
         netIncome: formatMoney(netIncome),
         ytdBasic: formatMoney(running.earnings),
         ytdTaxable: formatMoney(running.net),
@@ -613,17 +805,37 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
         payhouse: "M00600",
         payrollDateShort: formatDemoDate(dateKey(period.payday), shortDate),
         periodShort: `${formatDemoDate(dateKey(period.start), shortDate)} to ${formatDemoDate(dateKey(period.end), shortDate)}`,
-        noOfHours: BASIC_HOURS.toFixed(2),
-        noOfDays: "12.00",
-        basicRate: "750.00",
+        noOfHours: (paidDays * HOURS_PER_DAY).toFixed(2),
+        noOfDays: paidDays.toFixed(2),
+        basicRate: DAILY_RATE.toFixed(2),
         earnings: [
           {
             description: "Basic Pay",
-            hours: BASIC_HOURS.toFixed(2),
-            days: "12.00",
-            amount: formatMoney(BASIC_PAY),
+            hours: regularHours.toFixed(2),
+            days: basicDays.toFixed(2),
+            amount: formatMoney(basicPay),
           },
-          ...(tardinessHours > 0
+          ...(silDays > 0
+            ? [
+                {
+                  description: "Service Incentive Leave",
+                  hours: (silDays * HOURS_PER_DAY).toFixed(2),
+                  days: silDays.toFixed(2),
+                  amount: formatMoney(silPay),
+                },
+              ]
+            : []),
+          ...(lwopDays > 0
+            ? [
+                {
+                  description: "LWOP (Unpaid Absence)",
+                  hours: (lwopDays * HOURS_PER_DAY).toFixed(2),
+                  days: lwopDays.toFixed(2),
+                  amount: formatMoney(lwopPay),
+                },
+              ]
+            : []),
+          ...(lateMinutes > 0
             ? [
                 {
                   description: "UT/Tardiness",

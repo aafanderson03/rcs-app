@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// import { NotificationBell } from '@/components/notification-bell';
+import { NotificationBell } from '@/components/notification-bell';
 import { PortalCalendar } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
@@ -21,7 +21,7 @@ import {
   getDemoMonthlyLateSummary,
   getRecentDemoAttendance,
 } from '@/data/demo-data';
-import { getHolidays } from '@/data/holidays';
+import { getHolidays, type Holiday } from '@/data/holidays';
 import { getDemoMilestones } from '@/data/milestones';
 
 const workspaceContent: Record<EmployeeType, {
@@ -162,20 +162,35 @@ export default function HomeScreen() {
   const selectedKey = selectedDate ? dateKey(selectedDate) : '';
   const todayKey = dateKey(today);
   const milestones = getDemoMilestones(today);
-  // Events (holidays, payday, requests) for any date key
-  const todayHolidays = [...getHolidays(today.getFullYear()), ...getHolidays(today.getFullYear() + 1)];
-  const todayPaydays = paydaysAround(today).map(dateKey);
-  const eventsFor = (key: string) => [
-    ...[...holidays, ...todayHolidays]
-      .filter((holiday, i, all) => holiday.date === key && all.findIndex((h) => h.date === holiday.date && h.name === holiday.name) === i)
-      .map((holiday) => ({ label: holiday.name, note: `${holiday.scope} holiday` })),
-    ...(paydays.includes(key) || todayPaydays.includes(key) ? [{ label: 'Payday', note: '' }] : []),
+  const milestoneCount = isWide ? 12 : isDesktop ? 6 : 5;
+
+  // Schedule box: holidays (national and Tarlac), paydays and request activity
+  const agendaYears = Array.from(new Set([...holidayYears, today.getFullYear(), today.getFullYear() + 1]));
+  const holidayIndex = new Map<string, Holiday[]>();
+  agendaYears
+    .flatMap((year) => getHolidays(year))
+    .forEach((holiday) => {
+      holidayIndex.set(holiday.date, [...(holidayIndex.get(holiday.date) ?? []), holiday]);
+    });
+  const paydaySet = new Set([...paydaysAround(calendarMonth), ...paydaysAround(today)].map(dateKey));
+  const eventsOn = (key: string): AgendaEvent[] => [
+    ...(holidayIndex.get(key) ?? []).map((holiday) => ({
+      label: holiday.name,
+      note: `${holiday.scope} · ${holiday.kind}`,
+    })),
+    ...(paydaySet.has(key) ? [{ label: 'Payday', note: '' }] : []),
     ...applications
       .filter((item) => item.submittedAt === key)
       .map((item) => ({ label: `${item.type} request`, note: item.status })),
   ];
-  const calendarEvents = eventsFor(selectedKey);
-  const selectedIsToday = selectedKey === todayKey;
+  const upcomingLabels = ['Tomorrow', 'The day after', 'In 3 days']; // add or remove entries to change how many days show
+  const upcomingDays = upcomingLabels.map((label, index) => {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index + 1);
+    const key = dateKey(date);
+    return { label, key, events: eventsOn(key) };
+  });
+  const todayEvents = eventsOn(todayKey);
+  const selectedEvents = eventsOn(selectedKey);
 
   const summaryLine = [
     pendingCount > 0
@@ -212,16 +227,16 @@ export default function HomeScreen() {
         >
           <View style={styles.introMeta}>
             <Text style={styles.heroEyebrow}>{companyBranding.name.toUpperCase()} / EMPLOYEE PORTAL</Text>
-            <Text style={styles.heroDate}>Today is {formattedDate}</Text>
+            <Text style={styles.heroDate}>{formattedDate}</Text>
           </View>
           <Text style={[styles.heroTitle, isDesktop && styles.desktopHeroTitle]}>
             {firstName ? `${greeting}, ${firstName}` : greeting}
           </Text>
           <Text style={styles.heroSummary}>{summaryLine}</Text>
         </LinearGradient>
-        {/* <View style={styles.bellSlot}>
-          <NotificationBell /> */}
-        {/* </View> */}
+        <View style={styles.bellSlot}>
+          <NotificationBell />
+        </View>
         </View>
 
         {/* At a glance */}
@@ -378,26 +393,37 @@ export default function HomeScreen() {
               markedDates={markedDates}
             />
             <View style={styles.eventsBox}>
-              <Text style={styles.eventsDate}>
-                {selectedDate
-                  ? formatDemoDate(selectedKey, { weekday: 'long', month: 'long', day: 'numeric' })
-                  : 'Select a date'}
-              </Text>
-              {selectedDate ? (
-                <Text style={styles.eventsHeading}>{selectedIsToday ? "Today's Events" : 'Events'}</Text>
-              ) : null}
-              {selectedDate && !calendarEvents.length ? (
-                <Text style={styles.eventsEmpty}>Nothing scheduled.</Text>
-              ) : null}
-              {calendarEvents.map((event, index) => (
-                <View key={`${event.label}-${index}`} style={styles.eventRow}>
-                  <View style={styles.eventDot} />
-                  <Text style={styles.eventLabel}>{event.label}</Text>
-                  {event.note ? <Text style={styles.eventNote}>{event.note}</Text> : null}
+              {selectedDate && selectedKey !== todayKey ? (
+                <View style={[styles.eventsSection, styles.selectedSection]}>
+                  <Text style={styles.eventsDate}>
+                    Selected · {formatDemoDate(selectedKey, { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
+                  <EventList events={selectedEvents} styles={styles} />
                 </View>
-              ))}
+              ) : null}
+
+              <View style={styles.eventsSection}>
+                <Text style={styles.eventsDate}>{formattedDate}</Text>
+                <Text style={styles.eventsTitle}>Today’s events</Text>
+                <EventList events={todayEvents} styles={styles} />
+              </View>
+
+              <View style={[styles.eventsSection, styles.upcomingSection]}>
+                <Text style={styles.eyebrow}>UPCOMING</Text>
+                {upcomingDays.map((day) => (
+                  <View key={day.key} style={styles.upcomingDay}>
+                    <View style={styles.upcomingHead}>
+                      <Text style={styles.upcomingLabel}>{day.label}</Text>
+                      <Text style={styles.upcomingDate}>
+                        {formatDemoDate(day.key, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </Text>
+                    </View>
+                    <EventList events={day.events} styles={styles} />
+                  </View>
+                ))}
+              </View>
             </View>
-        </View>
+          </View>
 
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
             <View style={styles.columnHeading}>
@@ -411,15 +437,15 @@ export default function HomeScreen() {
                 <MilestoneGroup
                   title="Birthdays"
                   styles={styles}
-                  items={milestones.birthdays.map((m) => ({ name: m.name, note: m.date, past: m.past }))}
+                  items={milestones.birthdays.slice(0, milestoneCount).map((m) => ({ name: m.name, note: m.date, past: m.past }))}
                 />
               </View>
               <View style={[styles.milestoneDivider, isWide && styles.milestoneDividerVertical]} />
               <View style={styles.milestoneCol}>
                 <MilestoneGroup
-                  title="Work Anniversaries"
+                  title="Work anniversaries"
                   styles={styles}
-                  items={milestones.anniversaries.map((m) => ({
+                  items={milestones.anniversaries.slice(0, milestoneCount).map((m) => ({
                     name: m.name,
                     note: `${m.years} yr${m.years === 1 ? '' : 's'} · ${m.date}`,
                     past: m.past,
@@ -464,6 +490,25 @@ export default function HomeScreen() {
   );
 }
 
+type AgendaEvent = { label: string; note: string };
+
+function EventList({ events, styles }: { events: AgendaEvent[]; styles: ReturnType<typeof createStyles> }) {
+  if (!events.length) return <Text style={styles.eventsEmpty}>Nothing scheduled.</Text>;
+  return (
+    <View>
+      {events.map((event, index) => (
+        <View key={`${event.label}-${index}`} style={styles.eventRow}>
+          <View style={styles.eventDot} />
+          <View style={styles.eventCopy}>
+            <Text style={styles.eventLabel}>{event.label}</Text>
+            {event.note ? <Text style={styles.eventNote}>{event.note}</Text> : null}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function PunchRow({ label, time }: { label: string; time: string }) {
   const { colorScheme } = useAppTheme();
   const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
@@ -489,21 +534,15 @@ function MilestoneGroup({
   return (
     <View>
       <Text style={styles.milestoneTitle}>{title}</Text>
-      <ScrollView
-        style={styles.milestoneScroll}
-        nestedScrollEnabled
-        showsVerticalScrollIndicator
-      >
-        {items.map((item) => (
-          <View key={item.name} style={[styles.milestoneRow, item.past && styles.milestonePast]}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials(item.name)}</Text>
-            </View>
-            <Text style={styles.milestoneName} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.milestoneNote}>{item.note}</Text>
+      {items.map((item) => (
+        <View key={item.name} style={[styles.milestoneRow, item.past && styles.milestonePast]}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials(item.name)}</Text>
           </View>
-        ))}
-      </ScrollView>
+          <Text style={styles.milestoneName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.milestoneNote}>{item.note}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -516,12 +555,12 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   // Hero banner
   heroWrap: { marginBottom: 16, zIndex: 20, elevation: 20 },
   desktopHeroWrap: { marginBottom: 20 },
-  // bellSlot: { position: 'absolute', top: 20, right: 20, zIndex: 30, elevation: 30 },
+  bellSlot: { position: 'absolute', top: 14, right: 14, zIndex: 30, elevation: 30 },
   hero: { padding: 22, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   desktopHero: { padding: 34 },
   introMeta: { paddingRight: 56, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   heroEyebrow: { color: '#7A2E24', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  heroDate: { position: 'absolute', right: 10, color: 'rgba(0, 0, 0, 1)', fontSize: 12, fontWeight: '700' },
+  heroDate: { color: 'rgba(43,33,24,0.7)', fontSize: 12, fontWeight: '600' },
   heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 28, fontWeight: '700', letterSpacing: -0.6 },
   desktopHeroTitle: { fontSize: 38, letterSpacing: -1 },
   heroSummary: { maxWidth: 620, marginTop: 8, color: 'rgba(43,33,24,0.85)', fontSize: 14, lineHeight: 21 },
@@ -610,7 +649,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   cardActionArrow: { marginLeft: 7, color: colors.brown, fontSize: 15 },
 
   milestoneTitle: { marginBottom: 6, color: colors.text, fontSize: 13, fontWeight: '700' },
-  milestoneScroll: { maxHeight: 400, paddingRight: 4 },
   milestoneRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.yellowLight },
   avatarText: { color: colors.brown, fontSize: 10, fontWeight: '800' },
@@ -622,21 +660,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   fillCard: { flex: 1 },
   milestonePast: { opacity: 0.55 },
 
-  holidaysTitle: { marginTop: 16, marginBottom: 6, color: colors.text, fontSize: 13, fontWeight: '700' },
-  holidayRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-  holidayDivider: { borderTopWidth: 1, borderTopColor: colors.border },
-  holidayDate: {
-    width: 42,
-    alignItems: 'center',
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: colors.yellowLight,
-  },
-  holidayDay: { color: colors.brown, fontSize: 16, fontWeight: '800' },
-  holidayMonth: { color: colors.brown, fontSize: 9, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
-  holidayCopy: { flex: 1, minWidth: 0 },
-  holidayName: { color: colors.text, fontSize: 13, fontWeight: '600' },
-  holidayKind: { marginTop: 2, color: colors.grayMuted, fontSize: 11 },
   milestoneCol: { flex: 1, minWidth: 0 },
 
   announcement: { paddingVertical: 4 },
@@ -648,24 +671,28 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   viewDetails: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, minHeight: 28 },
   linkText: { color: colors.brown, fontSize: 12, fontWeight: '700' },
   eventsBox: {
-    marginTop: 10,
+    marginTop: 12,
     padding: 16,
     borderRadius: 5,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  eventsDate: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  eventsHeading: { marginTop: 4, color: colors.brown, fontSize: 10, fontWeight: '800', letterSpacing: 0.9, textTransform: 'uppercase' },
-  eventsSpacer: { height: 24 },
-  upcomingDay: { paddingVertical: 10 },
-  upcomingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  upcomingTitle: { color: colors.text, fontSize: 12, fontWeight: '700' },
-  eventsEmpty: { marginTop: 6, color: colors.grayMuted, fontSize: 12 },
-  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  eventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brown },
-  eventLabel: { flex: 1, color: colors.text, fontSize: 12, fontWeight: '600' },
-  eventNote: { color: colors.grayMuted, fontSize: 11 },
+  eventsSection: { gap: 2 },
+  selectedSection: { marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  eventsDate: { color: colors.grayMuted, fontSize: 11, fontWeight: '600' },
+  eventsTitle: { marginTop: 2, marginBottom: 4, color: colors.text, fontSize: 16, fontWeight: '700' },
+  eventsEmpty: { marginTop: 4, color: colors.grayMuted, fontSize: 12 },
+  eventRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 8 },
+  eventDot: { width: 8, height: 8, marginTop: 4, borderRadius: 4, backgroundColor: colors.brown },
+  eventCopy: { flex: 1, minWidth: 0 },
+  eventLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  eventNote: { marginTop: 1, color: colors.grayMuted, fontSize: 11 },
+  upcomingSection: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
+  upcomingDay: { marginTop: 12 },
+  upcomingHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  upcomingLabel: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  upcomingDate: { color: colors.grayMuted, fontSize: 11 },
 
   // Support
   support: {

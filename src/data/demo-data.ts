@@ -112,7 +112,12 @@ const SIL_MONTHS = [1, 4, 7, 9]; // Feb, May, Aug, Oct
 const LWOP_MONTHS = [0, 2, 5, 8, 9]; // Jan, Mar, Jun, Sep, Oct
 
 // Picks a workday (3rd–26th, never a Sunday) for the month's absence.
-function pickAbsenceDay(year: number, month: number, kind: string, avoid?: number) {
+function pickAbsenceDay(
+  year: number,
+  month: number,
+  kind: string,
+  avoid?: number,
+) {
   const random = createDateRandom(`absence-${kind}-${year}-${month}`);
   let day = 3 + Math.floor(random() * 22);
   while (new Date(year, month, day).getDay() === 0 || day === avoid) day += 1;
@@ -146,7 +151,10 @@ function silDaysUsedThisYear() {
   return used;
 }
 
-function buildAbsenceRecord(key: string, absence: "SIL" | "LWOP"): DemoAttendanceRecord {
+function buildAbsenceRecord(
+  key: string,
+  absence: "SIL" | "LWOP",
+): DemoAttendanceRecord {
   const shiftSpanMinutes = 17 * 60 + 30 - (8 * 60 + 30);
   return {
     date: key,
@@ -262,9 +270,9 @@ const demoDepartment = chooseDemoValue([
   "Supply and Inventory",
 ]);
 const demoStore = chooseDemoValue([
-  "RCS Demo Store · North District",
-  "RCS Demo Store · Central District",
-  "RCS Demo Store · South District",
+  "RCS Demo Store · Maligaya Branch",
+  "RCS Demo Store · Capas Branch ",
+  "RCS Demo Store · San Rafael Branch",
 ]);
 const demoManagerName = `${chooseDemoValue(["Rina", "Paolo", "Lara", "Enzo"])} ${chooseDemoValue(["Santiago", "Reyes", "Cruz", "Mendoza"])}`;
 
@@ -911,6 +919,25 @@ export const demoEmployeeNames = [
   "Marco Lim",
   "Nina Flores",
   "Andre Ramos",
+  "Clara Dela Cruz",
+  "Luis Navarro",
+  "Trisha Bautista",
+  "Enzo Villanueva",
+  "Grace Aquino",
+  "Noel Castillo",
+  "Lara Mendoza",
+  "Rina Santiago",
+  "Paolo Reyes",
+  "Isabel Cruz",
+  "Mateo Salazar",
+  "Lucia Mercado",
+  "Rafael Dominguez",
+  "Amara Navarro",
+  "Nico Villanueva",
+  "Talia Castillo",
+  "Elias Salazar",
+  "Sofia Mercado",
+  "Inez Dominguez",
 ];
 const demoAnniversaries = [
   { name: "Carlo Lim", years: 4 },
@@ -920,6 +947,19 @@ const demoAnniversaries = [
   { name: "Enzo Villanueva", years: 5 },
   { name: "Grace Aquino", years: 3 },
   { name: "Noel Castillo", years: 9 },
+  { name: "Lara Mendoza", years: 6 },
+  { name: "Rina Santiago", years: 8 },
+  { name: "Paolo Reyes", years: 10 },
+  { name: "Isabel Cruz", years: 2 },
+  { name: "Mateo Salazar", years: 4 },
+  { name: "Lucia Mercado", years: 1 },
+  { name: "Rafael Dominguez", years: 3 },
+  { name: "Amara Navarro", years: 5 },
+  { name: "Nico Villanueva", years: 7 },
+  { name: "Talia Castillo", years: 6 },
+  { name: "Elias Salazar", years: 8 },
+  { name: "Sofia Mercado", years: 9 },
+  { name: "Inez Dominguez", years: 10 },
 ];
 
 export const demoMilestones = {

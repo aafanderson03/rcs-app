@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
 import type { Href } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { ApplicationGuideContent, applicationGuide } from '@/components/application-guide';
+import { applicationGuide, ApplicationGuideContent } from '@/components/application-guide';
 import { ExternalLink } from '@/components/external-link';
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';

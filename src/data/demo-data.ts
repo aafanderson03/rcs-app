@@ -13,7 +13,7 @@ import {
 export const LATE_SANCTION_LADDER = [
   "1-day suspension",
   "3-day suspension",
-  "7-day suspension", // confirm this one
+  "7-day suspension",
   "Termination",
 ] as const;
 
@@ -22,12 +22,9 @@ export function getLateSanction(offenseNumber: number) {
   return LATE_SANCTION_LADDER[Math.max(0, index)];
 }
 
-// Allowed durations. Anything over these counts as lateness.
-export const ALLOWED_LUNCH_MINUTES = 70; // 1 hour 10 minutes
+export const ALLOWED_LUNCH_MINUTES = 70;
 export const ALLOWED_BREAK_MINUTES = 30;
 
-// How often the simulated employee is late (chance per workday).
-// Raise these for more lates, lower them for fewer.
 const LATE_ARRIVAL_CHANCE = 0.12;
 const LATE_LUNCH_CHANCE = 0.06;
 const LATE_BREAK_CHANCE = 0.06;
@@ -46,12 +43,12 @@ export type DemoPunch = {
 
 export type DemoAttendanceRecord = {
   date: string;
-  // "SIL" = paid absence (Service Incentive Leave), "LWOP" = unpaid absence
+
   status: "Present" | "Late" | "SIL" | "LWOP";
-  lateByMinutes: number; // arrival lateness only
-  lunchOverMinutes: number; // minutes past the allowed lunch
-  breakOverMinutes: number; // minutes past the allowed afternoon break
-  totalLateMinutes: number; // arrival + lunch + break
+  lateByMinutes: number;
+  lunchOverMinutes: number;
+  breakOverMinutes: number;
+  totalLateMinutes: number;
   scheduledShift: string;
   shiftSpanMinutes: number;
   unpaidLunchMinutes: number;
@@ -67,13 +64,15 @@ export type DemoMonthlyLateSummary = {
   lateMinutes: number;
   sanctionThresholdReached: boolean;
   sanction: string | null;
+  silDays: number;
+  lwopDays: number;
 };
 
 export type DemoApprover = {
   name: string;
   role: string;
   status: "Approved" | "Disapproved" | "Pending" | "Waiting" | "Skipped";
-  actedAt?: string; // YYYY-MM-DD
+  actedAt?: string;
   remarks?: string;
 };
 
@@ -103,15 +102,12 @@ export function dateKey(date: Date) {
 }
 
 export function isRestDay(date: Date) {
-  return date.getDay() === 0; // Sunday
+  return date.getDay() === 0;
 }
 
-// Simulated absences: one day in each listed month (0 = January).
-// SIL stays under the 5-day yearly allowance (at most 4 a year).
-const SIL_MONTHS = [1, 4, 7, 9]; // Feb, May, Aug, Oct
-const LWOP_MONTHS = [0, 2, 5, 8, 9]; // Jan, Mar, Jun, Sep, Oct
+const SIL_MONTHS = [1, 4, 7, 9];
+const LWOP_MONTHS = [0, 2, 5, 8, 9];
 
-// Picks a workday (3rd–26th, never a Sunday) for the month's absence.
 function pickAbsenceDay(
   year: number,
   month: number,
@@ -140,7 +136,6 @@ function getAbsenceType(date: Date): "SIL" | "LWOP" | null {
   return null;
 }
 
-// SIL days already taken this year (used for the leave balance).
 function silDaysUsedThisYear() {
   const year = todayStart.getFullYear();
   let used = 0;
@@ -168,7 +163,7 @@ function buildAbsenceRecord(
     unpaidLunchMinutes: ALLOWED_LUNCH_MINUTES,
     paidBreakMinutes: ALLOWED_BREAK_MINUTES,
     scheduledPaidMinutes: 8 * 60,
-    paidMinutes: absence === "SIL" ? 8 * 60 : 0, // SIL is paid, LWOP is not
+    paidMinutes: absence === "SIL" ? 8 * 60 : 0,
     punches: [],
     totalWorked: formatWorkedTime(0),
   };
@@ -262,19 +257,22 @@ const demoDesignation = chooseDemoValue([
   "Inventory Coordinator",
   "Store Operations Assistant",
   "Sales Associate",
+  "Visual Merchandiser",
 ]);
 const demoDepartment = chooseDemoValue([
   "Store Operations",
   "Customer Experience",
   "Merchandising",
   "Supply and Inventory",
+  "Human Resources",
 ]);
 const demoStore = chooseDemoValue([
   "RCS Demo Store · Maligaya Branch",
   "RCS Demo Store · Capas Branch ",
   "RCS Demo Store · San Rafael Branch",
+  "RCS Demo Store · San Isidro Branch",
 ]);
-const demoManagerName = `${chooseDemoValue(["Rina", "Paolo", "Lara", "Enzo"])} ${chooseDemoValue(["Santiago", "Reyes", "Cruz", "Mendoza"])}`;
+const demoManagerName = `${chooseDemoValue(["Rina", "Paolo", "Lara", "Enzo", "Maria", "Juan"])} ${chooseDemoValue(["Santiago", "Reyes", "Cruz", "Mendoza", "Torres", "Gonzales"])}`;
 
 export const demoEmployee = {
   name: `${demoFirstName} ${demoMiddleName} ${demoLastName}`,
@@ -309,24 +307,24 @@ function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
   if (absence) return buildAbsenceRecord(key, absence);
 
   const random = createDateRandom(key);
-  // Roughly 1 in 8 arrivals is late (1–10 min); otherwise 8:20–8:30 AM.
+
   const clockIn =
     random() < LATE_ARRIVAL_CHANCE
       ? 8 * 60 + 31 + Math.floor(random() * 10)
       : 8 * 60 + 20 + Math.floor(random() * 11);
-  const lunchOut = 11 * 60 + Math.floor(random() * 61); // leaves for lunch
+  const lunchOut = 11 * 60 + Math.floor(random() * 61);
   const afternoonBreakOut = 15 * 60 + 1 + Math.floor(random() * 90);
-  // Lunch is usually 62–70 min; occasionally runs 1–5 min over the allowed 70.
+
   const lunchDuration =
     random() < LATE_LUNCH_CHANCE
       ? ALLOWED_LUNCH_MINUTES + 1 + Math.floor(random() * 5)
       : ALLOWED_LUNCH_MINUTES - 8 + Math.floor(random() * 9);
-  // Break is usually 25–30 min; occasionally runs 1–4 min over the allowed 30.
+
   const breakDuration =
     random() < LATE_BREAK_CHANCE
       ? ALLOWED_BREAK_MINUTES + 1 + Math.floor(random() * 4)
       : ALLOWED_BREAK_MINUTES - 5 + Math.floor(random() * 6);
-  const lunchIn = lunchOut + lunchDuration; // returns from lunch
+  const lunchIn = lunchOut + lunchDuration;
   const afternoonBreakIn = afternoonBreakOut + breakDuration;
   const clockOut = 17 * 60 + 30;
 
@@ -338,7 +336,7 @@ function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
   const shiftSpanMinutes = clockOut - (8 * 60 + 30);
   const unpaidLunchMinutes = ALLOWED_LUNCH_MINUTES;
   const paidBreakMinutes = ALLOWED_BREAK_MINUTES;
-  const scheduledPaidMinutes = 8 * 60; // paid day is 8 hours
+  const scheduledPaidMinutes = 8 * 60;
   const paidMinutes = scheduledPaidMinutes - totalLateMinutes;
 
   return {
@@ -374,7 +372,6 @@ function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
   };
 }
 
-// The attendance screen only looks back 35 days.
 export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   if (todayStart.getTime() - start.getTime() > 35 * 24 * 60 * 60 * 1000)
@@ -382,7 +379,6 @@ export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
   return buildDemoAttendance(date);
 }
 
-// Payroll needs the same simulated punches for a whole pay period, however old.
 export function getDemoAttendanceForPayroll(
   date: Date,
 ): DemoAttendanceRecord | null {
@@ -399,15 +395,17 @@ export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
   let lateDays = 0;
   let lateMinutes = 0;
   let offenseNumber = 0;
+  let silDays = 0;
+  let lwopDays = 0;
 
   for (let day = 1; day <= finalDay; day += 1) {
     const record = getDemoAttendance(new Date(year, month, day));
+    if (record?.status === "SIL") silDays += 1;
+    if (record?.status === "LWOP") lwopDays += 1;
     if (record && record.totalLateMinutes > 0) {
       lateDays += 1;
       lateMinutes += record.totalLateMinutes;
-      // The late day that reaches the threshold (12 late days or 120 minutes)
-      // is offense 1 (1-day suspension). Every later late day is the next
-      // step: 3-day, 7-day, termination.
+
       if (lateDays >= 12 || lateMinutes >= 120) offenseNumber += 1;
     }
   }
@@ -418,6 +416,8 @@ export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
     lateMinutes,
     sanctionThresholdReached: reached,
     sanction: offenseNumber > 0 ? getLateSanction(offenseNumber) : null,
+    silDays,
+    lwopDays,
   };
 }
 
@@ -426,7 +426,7 @@ export function getRecentDemoAttendance() {
     const date = new Date(todayStart);
     date.setDate(date.getDate() - daysAgo);
     const record = getDemoAttendance(date);
-    // Skip absences: the "last workday" card should show a day that has punches.
+
     if (record && record.punches.length > 0) return record;
   }
   return null;
@@ -441,6 +441,27 @@ export function getDemoAttendanceDates(month: Date) {
   return Array.from({ length: daysInMonth }, (_, index) => {
     const date = new Date(month.getFullYear(), month.getMonth(), index + 1);
     return getDemoAttendance(date) ? dateKey(date) : null;
+  }).filter((value): value is string => value !== null);
+}
+
+export function getDemoAbsenceForKey(key: string): "SIL" | "LWOP" | null {
+  const [year, month, day] = key.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date >= todayStart || isRestDay(date)) return null;
+  return getAbsenceType(date);
+}
+
+export function getDemoAbsenceDates(month: Date) {
+  const daysInMonth = new Date(
+    month.getFullYear(),
+    month.getMonth() + 1,
+    0,
+  ).getDate();
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const key = dateKey(
+      new Date(month.getFullYear(), month.getMonth(), index + 1),
+    );
+    return getDemoAbsenceForKey(key) ? key : null;
   }).filter((value): value is string => value !== null);
 }
 
@@ -589,6 +610,35 @@ export const demoApplications: DemoApplication[] = [
       { name: "Paolo Reyes", role: "HR approver", status: "Skipped" },
     ],
   },
+  {
+    id: "DEMO-APP-1010",
+    type: "Leave",
+    summary: "Vacation leave · 2 days",
+    submittedAt: relativeDate(-35),
+    status: "Approved",
+    details: [
+      { label: "Leave type", value: "Vacation Leave" },
+      { label: "Date from", value: formatDemoDate(relativeDate(-32)) },
+      { label: "Date to", value: formatDemoDate(relativeDate(-31)) },
+      { label: "Applied days", value: "2" },
+      { label: "Period", value: "Whole Day" },
+      { label: "Reason", value: "Family errand · Sample" },
+    ],
+    approvers: [
+      {
+        name: demoEmployee.manager,
+        role: "Immediate supervisor",
+        status: "Approved",
+        actedAt: relativeDate(-34),
+      },
+      {
+        name: "Paolo Reyes",
+        role: "HR approver",
+        status: "Approved",
+        actedAt: relativeDate(-33),
+      },
+    ],
+  },
 ];
 
 export const demoLeaveBalances = [
@@ -619,6 +669,15 @@ export const demoLeaveBalances = [
     updated: relativeDate(-1),
     chargedTo: "SIL",
   },
+  {
+    type: "Emergency Leave",
+    used: "0.0",
+    total: "5.0",
+    from: "2026-12-31",
+    to: "2027-01-01",
+    updated: relativeDate(-1),
+    chargedTo: "Emergency Leave",
+  },
 ];
 
 export const demoLoans = [
@@ -628,6 +687,27 @@ export const demoLoans = [
     date: relativeDate(-90),
     deduction: "₱312.50",
     balance: "₱1,250.00",
+  },
+  {
+    type: "Company loan",
+    total: "₱12,000.00",
+    date: relativeDate(-180),
+    deduction: "₱1,000.00",
+    balance: "₱4,000.00",
+  },
+  {
+    type: "Emergency loan",
+    total: "₱5,000.00",
+    date: relativeDate(-30),
+    deduction: "₱500.00",
+    balance: "₱2,500.00",
+  },
+  {
+    type: "Personal loan",
+    total: "₱8,000.00",
+    date: relativeDate(-60),
+    deduction: "₱400.00",
+    balance: "₱3,200.00",
   },
   {
     type: "Company loan",
@@ -677,14 +757,12 @@ const formatMoney = (value: number) =>
 
 function adjustForWeekend(date: Date) {
   const day = date.getDay();
-  if (day === 6) date.setDate(date.getDate() - 1); // Saturday -> Friday
-  if (day === 0) date.setDate(date.getDate() - 2); // Sunday -> Friday
+  if (day === 6) date.setDate(date.getDate() - 1);
+  if (day === 0) date.setDate(date.getDate() - 2);
   return date;
 }
 
 function buildDemoPayslips(count: number): DemoPayslip[] {
-  // Government contributions are based on the monthly basic salary (daily rate x working days),
-  // then taken from the two monthly pay slips according to CONTRIBUTION_SCHEDULE.
   const monthlyBasic = DAILY_RATE * WORK_DAYS_PER_MONTH;
   const monthly = {
     sss: sssEmployeeShare(monthlyBasic),
@@ -692,7 +770,6 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
     pagIbig: pagIbigEmployeeShare(monthlyBasic),
   };
 
-  // Every half-month period for last year and this year, oldest first.
   const periods: { start: Date; end: Date; payday: Date }[] = [];
   for (const year of [todayStart.getFullYear() - 1, todayStart.getFullYear()]) {
     for (let month = 0; month < 12; month += 1) {
@@ -723,15 +800,14 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
 
   const ytd: Record<number, { earnings: number; net: number }> = {};
   const slips = periods
-    .filter((period) => period.payday <= todayStart) // only periods already paid
+    .filter((period) => period.payday <= todayStart)
     .map((period): DemoPayslip => {
       const year = period.start.getFullYear();
       const cutoff: 1 | 2 = period.start.getDate() === 1 ? 1 : 2;
 
-      // Days worked and late minutes come from the simulated attendance punches
       let daysWorked = 0;
-      let silDays = 0; // paid absences (Service Incentive Leave)
-      let lwopDays = 0; // unpaid absences (leave without pay)
+      let silDays = 0;
+      let lwopDays = 0;
       let lateMinutes = 0;
       for (
         const day = new Date(period.start);
@@ -752,8 +828,6 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
         lateMinutes += record.totalLateMinutes;
       }
 
-      // Basic Pay covers every scheduled workday except paid leave (SIL has its
-      // own line). Unpaid absences (LWOP) are then taken back out as a deduction.
       const basicDays = daysWorked + lwopDays;
       const regularHours = basicDays * HOURS_PER_DAY;
       const basicPay = round2(regularHours * (DAILY_RATE / HOURS_PER_DAY));
@@ -862,7 +936,7 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
       };
     });
 
-  return slips.reverse().slice(0, count); // newest first
+  return slips.reverse().slice(0, count);
 }
 
 export const demoPayslip = buildDemoPayslips(4);
@@ -888,6 +962,41 @@ export const demoAnnouncements = [
     date: relativeDate(-7),
     title: "Benefits enrollment window",
     body: "A sample benefits reminder with an example enrollment window and next steps for employees.",
+  },
+  {
+    id: "DEMO-NEWS-04",
+    category: "GENERAL",
+    date: relativeDate(-10),
+    title: "Company-wide meeting",
+    body: "Join us for the monthly company meeting to discuss updates and upcoming initiatives.",
+  },
+  {
+    id: "DEMO-NEWS-05",
+    category: "STORE OPERATIONS",
+    date: relativeDate(-15),
+    title: "Inventory audit schedule",
+    body: "Store teams should prepare for the upcoming inventory audit. This is a sample notice for demonstration purposes.",
+  },
+  {
+    id: "DEMO-NEWS-06",
+    category: "PEOPLE & CULTURE",
+    date: relativeDate(-20),
+    title: "Annual performance review window",
+    body: "Performance reviews will be conducted this quarter. Please ensure all documentation is up to date.",
+  },
+  {
+    id: "DEMO-NEWS-07",
+    category: "GENERAL",
+    date: relativeDate(-25),
+    title: "Holiday schedule announcement",
+    body: "The company will observe the following holidays. Please plan accordingly.",
+  },
+  {
+    id: "DEMO-NEWS-08",
+    category: "PAYROLL",
+    date: relativeDate(-30),
+    title: "Tax filing deadline reminder",
+    body: "Ensure all necessary documents are submitted before the tax filing deadline. This is a sample notice for demonstration purposes.",
   },
 ];
 

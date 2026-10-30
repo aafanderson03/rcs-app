@@ -1,62 +1,61 @@
-import type { DemoPayslip } from '@/data/demo-data';
+import type { DemoPayslip } from "@/data/demo-data";
 
 const esc = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
-const clean = (value: string) => value.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const clean = (value: string) =>
+  value.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-// e.g. "Payslip_Oct-20-2026_M00600": used as the PDF file name and the print tab title,
-// which browsers use as the default "Save as PDF" file name.
 export function payslipFileName(slip: DemoPayslip) {
   return `Payslip_${clean(slip.payrollDateShort)}_${clean(slip.payhouse)}`;
 }
 
-// Reference number printed in the footer, e.g. "M00600-Oct-20-2026"
 function payslipReference(slip: DemoPayslip) {
   return `${clean(slip.payhouse)}-${clean(slip.payrollDateShort)}`;
 }
 
-// Negative amounts print in parentheses, e.g. -1.57 -> (1.57)
-const isNegative = (value: string) => value.startsWith('-');
-const money = (value: string) => (isNegative(value) ? `(${value.slice(1)})` : value);
+const isNegative = (value: string) => value.startsWith("-");
+const money = (value: string) =>
+  isNegative(value) ? `(${value.slice(1)})` : value;
 
-// Positive amounts get a little right padding (the width of a ")") so the decimal points
-// line up with negative amounts in the same column.
 const amountCell = (value: string) =>
-  `<td class="n amt${isNegative(value) ? '' : ' pos'}">${esc(money(value))}</td>`;
+  `<td class="n amt${isNegative(value) ? "" : " pos"}">${esc(money(value))}</td>`;
 
-// Zero balances print as a dash so real balances stand out.
-const isZero = (value: string) => /^[-(]?0*\.?0*\)?$/.test(value.replace(/,/g, '').trim());
-const balance = (value: string) => (isZero(value) ? '–' : value);
+const isZero = (value: string) =>
+  /^[-(]?0*\.?0*\)?$/.test(value.replace(/,/g, "").trim());
+const balance = (value: string) => (isZero(value) ? "–" : value);
 
-const MIN_ROWS = 6; // tables are padded with ruled blank rows, like a pre-printed form
+const MIN_ROWS = 6;
 
 export type PayslipNameOverride = {
-  /** Full line shown as the employee name, e.g. "DELA CRUZ , JUAN M. (1234567890)" */
   employeeName?: string;
-  /** Short name shown on the acknowledgment stub */
+
   employeeNameShort?: string;
 };
 
-export function buildPayslipHtml(slip: DemoPayslip, override: PayslipNameOverride = {}) {
+export function buildPayslipHtml(
+  slip: DemoPayslip,
+  override: PayslipNameOverride = {},
+) {
   const employeeName = override.employeeName ?? slip.employeeName;
-  const employeeNameShort = override.employeeNameShort ?? slip.employeeNameShort;
+  const employeeNameShort =
+    override.employeeNameShort ?? slip.employeeNameShort;
   const printed = new Date().toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 
   const deductions = [...slip.deductions].sort((a, b) =>
-    a.description.localeCompare(b.description)
+    a.description.localeCompare(b.description),
   );
   const rowCount = Math.max(MIN_ROWS, slip.earnings.length, deductions.length);
   const blankRow = (cells: number) =>
-    `<tr class="blank">${'<td>&nbsp;</td>'.repeat(cells)}</tr>`;
+    `<tr class="blank">${"<td>&nbsp;</td>".repeat(cells)}</tr>`;
 
   const earningRows =
     slip.earnings
@@ -66,9 +65,9 @@ export function buildPayslipHtml(slip: DemoPayslip, override: PayslipNameOverrid
         <td class="n">${esc(row.hours)}</td>
         <td class="n">${esc(row.days)}</td>
         ${amountCell(row.amount)}
-      </tr>`
+      </tr>`,
       )
-      .join('') + blankRow(4).repeat(rowCount - slip.earnings.length);
+      .join("") + blankRow(4).repeat(rowCount - slip.earnings.length);
 
   const deductionRows =
     deductions
@@ -77,12 +76,12 @@ export function buildPayslipHtml(slip: DemoPayslip, override: PayslipNameOverrid
         <td>${esc(row.description)}</td>
         <td class="n amt">${esc(row.amount)}</td>
         <td class="n">${esc(balance(row.balance))}</td>
-      </tr>`
+      </tr>`,
       )
-      .join('') + blankRow(3).repeat(rowCount - deductions.length);
+      .join("") + blankRow(3).repeat(rowCount - deductions.length);
 
   const kv = (label: string, value: string) =>
-    `<tr><td class="k">${esc(label)}</td><td class="v">${esc(value || '')}</td></tr>`;
+    `<tr><td class="k">${esc(label)}</td><td class="v">${esc(value || "")}</td></tr>`;
 
   return `<!doctype html>
 <html>
@@ -191,7 +190,7 @@ export function buildPayslipHtml(slip: DemoPayslip, override: PayslipNameOverrid
         <div class="info2">
           <div><div class="label">Position</div><div class="value">${esc(slip.position)}</div></div>
           <div><div class="label">Department</div><div class="value">${esc(slip.department)}</div></div>
-          <div><div class="label">Tax status</div><div class="value">${esc(slip.taxStatus || '—')}</div></div>
+          <div><div class="label">Tax status</div><div class="value">${esc(slip.taxStatus || "—")}</div></div>
         </div>
 
         <div class="tables">
@@ -221,14 +220,14 @@ export function buildPayslipHtml(slip: DemoPayslip, override: PayslipNameOverrid
 
         <div class="details">
           <table>
-            ${kv('No. of hours', slip.noOfHours)}
-            ${kv('No. of days', slip.noOfDays)}
-            ${kv('Basic rate', slip.basicRate)}
+            ${kv("No. of hours", slip.noOfHours)}
+            ${kv("No. of days", slip.noOfDays)}
+            ${kv("Basic rate", slip.basicRate)}
           </table>
           <table>
-            ${kv('YTD basic', slip.ytdBasic)}
-            ${kv('YTD taxable', slip.ytdTaxable)}
-            ${kv('YTD tax withheld', slip.ytdTaxWithheld || '0.00')}
+            ${kv("YTD basic", slip.ytdBasic)}
+            ${kv("YTD taxable", slip.ytdTaxable)}
+            ${kv("YTD tax withheld", slip.ytdTaxWithheld || "0.00")}
           </table>
         </div>
         <div class="foot">

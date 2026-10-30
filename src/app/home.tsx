@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NotificationBell } from '@/components/notification-bell';
 import { PortalCalendar } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
@@ -18,6 +17,8 @@ import {
   demoLeaveBalances,
   formatDemoDate,
   formatDemoDuration,
+  getDemoAbsenceDates,
+  getDemoAbsenceForKey,
   getDemoMonthlyLateSummary,
   getRecentDemoAttendance,
 } from '@/data/demo-data';
@@ -65,8 +66,6 @@ const routeGlyphs: Record<string, string> = {
   '/help': '?',
 };
 
-// Payday: the 20th (for the 1st–15th period) and the 5th (for the 16th–end period).
-// A weekend payday moves to the Friday before.
 function nextPayday(from: Date) {
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const candidates: Date[] = [];
@@ -83,7 +82,7 @@ function nextPayday(from: Date) {
   return { date: next, days };
 }
 
-// Paydays in the month before, of, and after the given month (for calendar markers)
+
 function paydaysAround(month: Date) {
   const days: Date[] = [];
   for (let offset = -1; offset <= 1; offset += 1) {
@@ -117,7 +116,7 @@ export default function HomeScreen() {
   const workspace = workspaceContent[employeeType];
   const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
 
-  // Computed on render, so it stays correct if the app is left open past midnight
+  
   const today = new Date();
   const hour = today.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -134,6 +133,21 @@ export default function HomeScreen() {
   const hoursRatio = recentAttendance
     ? Math.min(1, recentAttendance.paidMinutes / recentAttendance.scheduledPaidMinutes)
     : 0;
+ 
+  const overByLabel: Record<string, number> = recentAttendance
+    ? {
+        'Check in': recentAttendance.lateByMinutes,
+        'Lunch in': recentAttendance.lunchOverMinutes,
+        'Afternoon break in': recentAttendance.breakOverMinutes,
+      }
+    : {};
+  const lateParts = recentAttendance
+    ? [
+        { label: 'Arrival', mins: recentAttendance.lateByMinutes },
+        { label: 'Lunch', mins: recentAttendance.lunchOverMinutes },
+        { label: 'Break', mins: recentAttendance.breakOverMinutes },
+      ].filter((part) => part.mins > 0)
+    : [];
 
   const pendingCount = applications.filter((item) => item.status === 'Pending').length;
   const payday = nextPayday(today);
@@ -143,8 +157,9 @@ export default function HomeScreen() {
   const vacation = demoLeaveBalances.find((item) => item.type === 'Vacation Leave');
   const vacationLeft = vacation ? (Number(vacation.total) - Number(vacation.used)).toFixed(1) : '—';
   const lateSummary = getDemoMonthlyLateSummary(today);
+  const absenceTotal = lateSummary.silDays + lateSummary.lwopDays;
 
-  // Calendar: paydays and request activity
+  
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => today);
   const paydays = paydaysAround(calendarMonth).map(dateKey);
@@ -157,6 +172,7 @@ export default function HomeScreen() {
   const markedDates = [
     ...paydays,
     ...holidays.map((holiday) => holiday.date),
+    ...getDemoAbsenceDates(calendarMonth),
     ...applications.map((item) => item.submittedAt),
   ];
   const selectedKey = selectedDate ? dateKey(selectedDate) : '';
@@ -164,7 +180,7 @@ export default function HomeScreen() {
   const milestones = getDemoMilestones(today);
   const milestoneCount = isWide ? 12 : isDesktop ? 6 : 5;
 
-  // Schedule box: holidays (national and Tarlac), paydays and request activity
+  
   const agendaYears = Array.from(new Set([...holidayYears, today.getFullYear(), today.getFullYear() + 1]));
   const holidayIndex = new Map<string, Holiday[]>();
   agendaYears
@@ -173,16 +189,26 @@ export default function HomeScreen() {
       holidayIndex.set(holiday.date, [...(holidayIndex.get(holiday.date) ?? []), holiday]);
     });
   const paydaySet = new Set([...paydaysAround(calendarMonth), ...paydaysAround(today)].map(dateKey));
-  const eventsOn = (key: string): AgendaEvent[] => [
-    ...(holidayIndex.get(key) ?? []).map((holiday) => ({
-      label: holiday.name,
-      note: `${holiday.scope} · ${holiday.kind}`,
-    })),
-    ...(paydaySet.has(key) ? [{ label: 'Payday', note: '' }] : []),
-    ...applications
-      .filter((item) => item.submittedAt === key)
-      .map((item) => ({ label: `${item.type} request`, note: item.status })),
-  ];
+  const eventsOn = (key: string): AgendaEvent[] => {
+    const absence = getDemoAbsenceForKey(key);
+    return [
+      ...(holidayIndex.get(key) ?? []).map((holiday) => ({
+        label: holiday.name,
+        note: `${holiday.scope} · ${holiday.kind}`,
+      })),
+      ...(paydaySet.has(key) ? [{ label: 'Payday', note: '' }] : []),
+      ...(absence
+        ? [
+            absence === 'SIL'
+              ? { label: 'Absent · Service Incentive Leave', note: 'Paid absence' }
+              : { label: 'Absent · Leave without pay', note: 'Unpaid absence', alert: true },
+          ]
+        : []),
+      ...applications
+        .filter((item) => item.submittedAt === key)
+        .map((item) => ({ label: `${item.type} request`, note: item.status })),
+    ];
+  };
   const upcomingLabels = ['Tomorrow', 'The day after', 'In 3 days']; // add or remove entries to change how many days show
   const upcomingDays = upcomingLabels.map((label, index) => {
     const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index + 1);
@@ -197,17 +223,28 @@ export default function HomeScreen() {
       ? `You have ${pendingCount} pending request${pendingCount === 1 ? '' : 's'} awaiting approval.`
       : 'You have no pending requests.',
     `Next payday is ${paydayText}.`,
+    lateSummary.lateMinutes > 0
+      ? `${lateSummary.lateMinutes} late minute${lateSummary.lateMinutes === 1 ? '' : 's'} so far this month.`
+      : 'No late minutes this month.',
   ].join(' ');
 
   const tiles = [
-    { label: 'Pending requests', value: String(pendingCount), caption: 'Review applications', route: '/applications' },
-    { label: 'Next payday', value: paydayText, caption: paydayCaption, route: '/inquiry/pay-slip' },
-    { label: 'Vacation leave left', value: vacationLeft, caption: 'days this year', route: '/inquiry/leave-balances' },
+    { label: 'Pending requests', value: String(pendingCount), caption: 'Review applications', route: '/applications', alert: false },
+    { label: 'Next payday', value: paydayText, caption: paydayCaption, route: '/inquiry/pay-slip', alert: false },
+    { label: 'Vacation leave left', value: vacationLeft, caption: 'days this year', route: '/inquiry/leave-balances', alert: false },
     {
       label: 'Late this month',
       value: String(lateSummary.lateDays),
-      caption: lateSummary.lateDays === 1 ? 'day' : 'days',
+      caption: `${lateSummary.lateDays === 1 ? 'day' : 'days'} · ${lateSummary.lateMinutes} min`,
       route: '/attendance',
+      alert: lateSummary.sanctionThresholdReached,
+    },
+    {
+      label: 'Absences this month',
+      value: String(absenceTotal),
+      caption: `${lateSummary.silDays} paid · ${lateSummary.lwopDays} unpaid`,
+      route: '/attendance',
+      alert: false,
     },
   ];
 
@@ -234,10 +271,26 @@ export default function HomeScreen() {
           </Text>
           <Text style={styles.heroSummary}>{summaryLine}</Text>
         </LinearGradient>
-        <View style={styles.bellSlot}>
-          <NotificationBell />
         </View>
-        </View>
+
+        {/* Attendance notice: shown once the monthly lateness limit is passed */}
+        {lateSummary.sanction ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open attendance and DTR"
+            onPress={() => router.push('/attendance')}
+            style={({ pressed }) => [styles.notice, pressed && styles.pressed]}
+          >
+            <View style={styles.noticeAccent} />
+            <View style={styles.noticeCopy}>
+              <Text style={styles.noticeTitle}>Attendance notice · {lateSummary.sanction}</Text>
+              <Text style={styles.noticeText}>
+                You passed the monthly lateness limit (12 late days or 120 minutes). Tap to review your record.
+              </Text>
+            </View>
+            <Text style={styles.noticeArrow}>→</Text>
+          </Pressable>
+        ) : null}
 
         {/* At a glance */}
         <View style={[styles.tiles, isMobile && styles.mobileTiles]}>
@@ -250,7 +303,7 @@ export default function HomeScreen() {
               style={({ pressed }) => [styles.tile, isMobile && styles.mobileTile, pressed && styles.pressed]}
             >
               <Text style={styles.tileLabel}>{tile.label}</Text>
-              <Text style={styles.tileValue}>{tile.value}</Text>
+              <Text style={[styles.tileValue, tile.alert && styles.tileValueAlert]}>{tile.value}</Text>
               <Text style={styles.tileCaption}>{tile.caption}</Text>
             </Pressable>
           ))}
@@ -309,7 +362,7 @@ export default function HomeScreen() {
                 </View>
                 {recentAttendance?.status === 'Late' ? (
                   <View style={styles.lateBadge}>
-                    <Text style={styles.lateText}>Late {recentAttendance.lateByMinutes} min</Text>
+                    <Text style={styles.lateText}>Late {recentAttendance.totalLateMinutes} min</Text>
                   </View>
                 ) : recentAttendance ? (
                   <View style={styles.onTimeBadge}>
@@ -320,11 +373,50 @@ export default function HomeScreen() {
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${hoursRatio * 100}%` }]} />
               </View>
+              {lateParts.length ? (
+                <View style={styles.chipRow}>
+                  {lateParts.map((part) => (
+                    <View key={part.label} style={styles.chip}>
+                      <Text style={styles.chipText}>{part.label} +{part.mins}m</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
               <View style={styles.punchList}>
                 {recentAttendance?.punches.map((punch) => (
-                  <PunchRow key={punch.label} label={punch.label} time={punch.time} />
+                  <PunchRow
+                    key={punch.label}
+                    label={punch.label}
+                    time={punch.time}
+                    over={overByLabel[punch.label] ?? 0}
+                    styles={styles}
+                  />
                 ))}
               </View>
+
+              {/* This month: late minutes and absences */}
+              <View style={styles.monthStrip}>
+                <View style={styles.monthStat}>
+                  <Text style={[styles.monthValue, lateSummary.sanctionThresholdReached && styles.monthValueAlert]}>
+                    {lateSummary.lateMinutes}
+                  </Text>
+                  <Text style={styles.monthLabel}>Late min</Text>
+                </View>
+                <View style={styles.monthDivider} />
+                <View style={styles.monthStat}>
+                  <Text style={styles.monthValue}>{lateSummary.silDays}</Text>
+                  <Text style={styles.monthLabel}>Paid leave</Text>
+                </View>
+                <View style={styles.monthDivider} />
+                <View style={styles.monthStat}>
+                  <Text style={[styles.monthValue, lateSummary.lwopDays > 0 && styles.monthValueAlert]}>
+                    {lateSummary.lwopDays}
+                  </Text>
+                  <Text style={styles.monthLabel}>Unpaid</Text>
+                </View>
+              </View>
+              <Text style={styles.monthCaption}>This month so far</Text>
+
               <View style={styles.cardAction}>
                 <Text style={styles.cardActionText}>View attendance record</Text>
                 <Text style={styles.cardActionArrow}>→</Text>
@@ -346,7 +438,9 @@ export default function HomeScreen() {
               {demoAnnouncements.slice(0, 3).map((item, index) => (
                 <View key={item.id} style={[styles.announcement, index > 0 && styles.announcementDivider]}>
                   <View style={styles.announcementMeta}>
-                    <Text style={styles.announcementCategory}>{item.category}</Text>
+                    <View style={styles.announcementChip}>
+                      <Text style={styles.announcementCategory}>{item.category}</Text>
+                    </View>
                     <Text style={styles.announcementDate}>
                       {formatDemoDate(item.date, { month: 'short', day: 'numeric' })}
                     </Text>
@@ -375,7 +469,7 @@ export default function HomeScreen() {
             <View style={styles.columnHeading}>
               <View>
                 <Text style={styles.eyebrow}>CALENDAR</Text>
-                <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Paydays & requests</Text>
+                <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Paydays, absences & requests</Text>
               </View>
             </View>
             <PortalCalendar
@@ -490,7 +584,7 @@ export default function HomeScreen() {
   );
 }
 
-type AgendaEvent = { label: string; note: string };
+type AgendaEvent = { label: string; note: string; alert?: boolean };
 
 function EventList({ events, styles }: { events: AgendaEvent[]; styles: ReturnType<typeof createStyles> }) {
   if (!events.length) return <Text style={styles.eventsEmpty}>Nothing scheduled.</Text>;
@@ -498,7 +592,7 @@ function EventList({ events, styles }: { events: AgendaEvent[]; styles: ReturnTy
     <View>
       {events.map((event, index) => (
         <View key={`${event.label}-${index}`} style={styles.eventRow}>
-          <View style={styles.eventDot} />
+          <View style={[styles.eventDot, event.alert && styles.eventDotAlert]} />
           <View style={styles.eventCopy}>
             <Text style={styles.eventLabel}>{event.label}</Text>
             {event.note ? <Text style={styles.eventNote}>{event.note}</Text> : null}
@@ -509,15 +603,22 @@ function EventList({ events, styles }: { events: AgendaEvent[]; styles: ReturnTy
   );
 }
 
-function PunchRow({ label, time }: { label: string; time: string }) {
-  const { colorScheme } = useAppTheme();
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
+function PunchRow({
+  label,
+  time,
+  over,
+  styles,
+}: {
+  label: string;
+  time: string;
+  over: number;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.punchRow}>
       <Text style={styles.punchLabel}>{label}</Text>
-      <Text style={styles.punchTime}>{time}</Text>
+      {over > 0 ? <Text style={styles.punchOver}>+{over}m</Text> : null}
+      <Text style={[styles.punchTime, over > 0 && styles.punchTimeLate]}>{time}</Text>
     </View>
   );
 }
@@ -552,20 +653,39 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   content: { width: '100%', padding: 20, paddingBottom: 40 },
   desktopContent: { alignSelf: 'center', maxWidth: 1320, padding: 42, paddingBottom: 60 },
 
-  // Hero banner
+
   heroWrap: { marginBottom: 16, zIndex: 20, elevation: 20 },
   desktopHeroWrap: { marginBottom: 20 },
-  bellSlot: { position: 'absolute', top: 14, right: 14, zIndex: 30, elevation: 30 },
   hero: { padding: 22, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   desktopHero: { padding: 34 },
-  introMeta: { paddingRight: 56, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  heroEyebrow: { color: '#7A2E24', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
+  introMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  heroEyebrow: { color: '#7A2E24', fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
   heroDate: { color: 'rgba(43,33,24,0.7)', fontSize: 12, fontWeight: '600' },
   heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 28, fontWeight: '700', letterSpacing: -0.6 },
   desktopHeroTitle: { fontSize: 38, letterSpacing: -1 },
-  heroSummary: { maxWidth: 620, marginTop: 8, color: 'rgba(43,33,24,0.85)', fontSize: 14, lineHeight: 21 },
+  heroSummary: { maxWidth: 680, marginTop: 8, color: 'rgba(43,33,24,0.85)', fontSize: 14, lineHeight: 21 },
 
-  // At-a-glance tiles
+
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingVertical: 14,
+    paddingRight: 16,
+    borderRadius: 5,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noticeAccent: { alignSelf: 'stretch', width: 4, backgroundColor: colors.danger },
+  noticeCopy: { flex: 1, minWidth: 0 },
+  noticeTitle: { color: colors.danger, fontSize: 13, fontWeight: '800' },
+  noticeText: { marginTop: 3, color: colors.grayDark, fontSize: 12, lineHeight: 18 },
+  noticeArrow: { color: colors.danger, fontSize: 18 },
+
+
   tiles: { flexDirection: 'row', gap: 12, marginBottom: 30 },
   mobileTiles: { flexWrap: 'wrap' },
   tile: {
@@ -577,18 +697,19 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     borderWidth: 1,
     borderColor: colors.border,
   },
-  mobileTile: { flexBasis: '47%' },
+  mobileTile: { flexBasis: '47%', flexGrow: 1 },
   tileLabel: { color: colors.grayMuted, fontSize: 11, fontWeight: '700' },
   tileValue: { marginTop: 8, color: colors.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  tileValueAlert: { color: colors.danger },
   tileCaption: { marginTop: 3, color: colors.grayMuted, fontSize: 11 },
 
-  // Sections
+
   section: { marginBottom: 32 },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700', letterSpacing: -0.25 },
   desktopSectionTitle: { fontSize: 21 },
-  eyebrow: { marginBottom: 5, color: colors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  eyebrow: { marginBottom: 5, color: colors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
 
-  // Quick access
+
   quickGrid: { marginTop: 14, gap: 10 },
   desktopQuickGrid: { flexDirection: 'row', gap: 14 },
   quickCard: {
@@ -617,7 +738,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   quickDetail: { marginTop: 3, color: colors.grayMuted, fontSize: 12, lineHeight: 17 },
   quickArrow: { color: colors.brown, fontSize: 18 },
 
-  // Attendance + milestones
+
   columns: { gap: 28, marginBottom: 32 },
   desktopColumns: { flexDirection: 'row', gap: 32 },
   column: { minWidth: 0 },
@@ -635,15 +756,37 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   hoursValue: { color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
   hoursCaption: { marginTop: 2, color: colors.grayMuted, fontSize: 12 },
   lateBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3, backgroundColor: colors.grayLight },
-  lateText: { color: colors.danger, fontSize: 11, fontWeight: '700' },
+  lateText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   onTimeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3, backgroundColor: colors.yellowLight },
-  onTimeText: { color: colors.brownDark, fontSize: 11, fontWeight: '700' },
+  onTimeText: { color: colors.brownDark, fontSize: 12, fontWeight: '700' },
   progressTrack: { height: 8, marginTop: 14, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.grayLight },
   progressFill: { height: '100%', borderRadius: 4, backgroundColor: colors.brown },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, backgroundColor: colors.grayLight },
+  chipText: { color: colors.danger, fontSize: 11, fontWeight: '700' },
   punchList: { marginTop: 12 },
-  punchRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.grayLight },
+  punchRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.grayLight },
   punchLabel: { flex: 1, color: colors.grayMuted, fontSize: 12, fontWeight: '600' },
+  punchOver: { color: colors.danger, fontSize: 11, fontWeight: '700' },
   punchTime: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  punchTimeLate: { color: colors.danger },
+
+
+  monthStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 4,
+    backgroundColor: colors.background,
+  },
+  monthStat: { flex: 1, alignItems: 'center' },
+  monthValue: { color: colors.text, fontSize: 20, fontWeight: '700' },
+  monthValueAlert: { color: colors.danger },
+  monthLabel: { marginTop: 2, color: colors.grayMuted, fontSize: 11, fontWeight: '600' },
+  monthDivider: { width: 1, height: 28, backgroundColor: colors.border },
+  monthCaption: { marginTop: 6, color: colors.grayMuted, fontSize: 11, textAlign: 'center' },
+
   cardAction: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
   cardActionText: { color: colors.brown, fontSize: 13, fontWeight: '700' },
   cardActionArrow: { marginLeft: 7, color: colors.brown, fontSize: 15 },
@@ -664,10 +807,11 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
 
   announcement: { paddingVertical: 4 },
   announcementDivider: { marginTop: 12, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
-  announcementMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  announcementCategory: { color: colors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 0.9 },
+  announcementMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  announcementChip: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, backgroundColor: colors.yellowLight },
+  announcementCategory: { color: colors.brownDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   announcementDate: { color: colors.grayMuted, fontSize: 11 },
-  announcementTitle: { marginTop: 6, color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  announcementTitle: { marginTop: 8, color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
   viewDetails: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, minHeight: 28 },
   linkText: { color: colors.brown, fontSize: 12, fontWeight: '700' },
   eventsBox: {
@@ -685,6 +829,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   eventsEmpty: { marginTop: 4, color: colors.grayMuted, fontSize: 12 },
   eventRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 8 },
   eventDot: { width: 8, height: 8, marginTop: 4, borderRadius: 4, backgroundColor: colors.brown },
+  eventDotAlert: { backgroundColor: colors.danger },
   eventCopy: { flex: 1, minWidth: 0 },
   eventLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
   eventNote: { marginTop: 1, color: colors.grayMuted, fontSize: 11 },
@@ -694,7 +839,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   upcomingLabel: { color: colors.text, fontSize: 13, fontWeight: '700' },
   upcomingDate: { color: colors.grayMuted, fontSize: 11 },
 
-  // Support
   support: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -717,5 +861,5 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   ticketButtonText: { color: colors.white, fontSize: 13, fontWeight: '700' },
 
   pressed: { opacity: 0.8 },
-  footer: { marginTop: 24, color: colors.grayMuted, fontSize: 10, lineHeight: 15 },
+  footer: { marginTop: 24, color: colors.grayMuted, fontSize: 11, lineHeight: 15 },
 });

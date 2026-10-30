@@ -7,7 +7,7 @@ module.exports = function withPrototypeHttpPortal(config) {
       throw new Error('Could not configure HTTP access: Android application manifest is missing.');
     }
 
-    // Prototype only: remove this global HTTP allowance when the portal supports HTTPS.
+
     application.$['android:usesCleartextTraffic'] = 'true';
     return config;
   });

@@ -45,7 +45,7 @@ export default function AttendanceScreen() {
     setSelectedDate(today);
   };
 
-  // Progress bar toward a sanction limit; turns red once the limit is reached.
+
   const renderLateBar = (label: string, value: number, limit: number, unit: string) => {
     const reached = value >= limit;
     return (
@@ -72,7 +72,6 @@ export default function AttendanceScreen() {
   const renderRecord = () => {
     if (!selectedRecord) return null;
 
-    // Absence days have no punches: show what kind of absence it was and whether it's paid.
     if (selectedRecord.status === 'SIL' || selectedRecord.status === 'LWOP') {
       const isPaid = selectedRecord.status === 'SIL';
       return (
@@ -249,7 +248,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       fontWeight: '800',
     },
 
-    // Daily record card
+
     recordCard: { padding: 18, borderRadius: 5, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
     recordHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
     recordHeaderCopy: { flex: 1, minWidth: 0 },
@@ -262,11 +261,10 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     progressTrack: { height: 8, marginTop: 14, borderRadius: 4, overflow: 'hidden', backgroundColor: RcsColors.grayLight },
     progressFill: { height: '100%', borderRadius: 4, backgroundColor: RcsColors.brown },
 
-    // Absence days
     absenceTitle: { color: RcsColors.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
     absenceNote: { marginTop: 14, color: RcsColors.grayDark, fontSize: 13, lineHeight: 20 },
 
-    // Punches
+ 
     punchList: { marginTop: 12 },
     punchRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: RcsColors.border },
     directionTag: { width: 36, paddingVertical: 3, alignItems: 'center', borderRadius: 3 },
@@ -280,7 +278,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     punchTime: { minWidth: 76, textAlign: 'right', color: RcsColors.text, fontSize: 14, fontWeight: '700' },
     punchTimeLate: { color: RcsColors.danger },
 
-    // Monthly lateness card
+
     lateCard: { padding: 18, borderRadius: 5, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
     lateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 },
     lateTitle: { flexShrink: 1, color: RcsColors.brownDark, fontSize: 14, fontWeight: '800' },
@@ -296,7 +294,6 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     barFillReached: { backgroundColor: RcsColors.danger },
     lateCaption: { marginTop: 2, color: RcsColors.grayMuted, fontSize: 12, lineHeight: 18 },
 
-    // Empty states
     noRecord: { padding: 20, borderRadius: 5, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
     restDayLabel: { marginBottom: 6, color: RcsColors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
     noRecordTitle: { color: RcsColors.brownDark, fontSize: 14, fontWeight: '800' },

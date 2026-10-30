@@ -46,8 +46,7 @@ export default function EmployeeRecordScreen() {
   const { section } = useLocalSearchParams<{ section: string }>();
   const title = section ? sectionTitles[section] : undefined;
   const identity = useMemo(() => resolveIdentity(user), [user]);
-  // Personal/Employment Information have full layouts; every other section is shown in the
-  // same card and grid style, built from its label/value rows.
+ 
   const groups = useMemo<RecordGroup[]>(() => {
     const custom = getEmployeeRecordGroups(section, identity);
     if (custom) return custom;
@@ -60,7 +59,7 @@ export default function EmployeeRecordScreen() {
         columns: 3,
         fields: sampleRows.map((row) => ({
           label: row.label,
-          // Keep the person's name consistent with the signed-in user
+ 
           value: row.label === 'Account name' || row.label === 'Name' ? identity.fullName : row.value,
         })),
       },

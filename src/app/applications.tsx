@@ -381,7 +381,7 @@ export default function ApplicationsScreen() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const selectedApplication = applications.find((item) => item.id === selectedId) ?? null;
-  // Transaction + date filters feed the status tiles; the status tile then narrows the list.
+
   const baseApplications = applications.filter((item) =>
     (transactionFilter === 'All transaction types' || item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile'))) &&
     (!from || item.submittedAt >= from) &&
@@ -726,7 +726,7 @@ function ApplicationCard({ item, onPress }: { item: DemoApplication; onPress: ()
 
 function getApprovers(item: DemoApplication): DemoApprover[] {
   if (item.approvers?.length) {
-    // A cancelled request never reaches approvers who had not acted yet.
+
     return item.status === 'Cancelled'
       ? item.approvers.map((approver) =>
           approver.status === 'Pending' || approver.status === 'Waiting'
@@ -735,7 +735,7 @@ function getApprovers(item: DemoApplication): DemoApprover[] {
         )
       : item.approvers;
   }
-  // Fictional fallback chain derived from the request status.
+
   const s = item.status;
   return [
     {

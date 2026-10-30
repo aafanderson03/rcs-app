@@ -155,7 +155,7 @@ const printPayslip = async () => {
   const fileName = payslipFileName(selectedPayslip);
   try {
     if (Platform.OS === 'web') {
-      // Landscape comes from @page in the HTML; the tab title becomes the file name.
+
       const win = window.open('', '_blank');
       if (!win) throw new Error('Pop-up blocked');
       win.document.write(html);
@@ -165,7 +165,7 @@ const printPayslip = async () => {
       return;
     }
 
-    // Phone: make a landscape A4 PDF, give it a proper name, then open the share sheet.
+
     const { uri } = await Print.printToFileAsync({ html, width: 842, height: 595 });
     const named = new File(Paths.cache, `${fileName}.pdf`);
     if (named.exists) named.delete();

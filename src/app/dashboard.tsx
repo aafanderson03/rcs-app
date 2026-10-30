@@ -33,11 +33,11 @@ export default function DashboardScreen() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
-  // Date filter only: used for the stat tiles so they always show the full status picture.
+
   const dateRows = applications.filter(
     (item) => (!from || item.submittedAt >= from) && (!to || item.submittedAt <= to)
   );
-  // Date + status filter: used for the chart.
+
   const rows = dateRows.filter((item) => status === 'All statuses' || item.status === status);
 
   const statusTotals = trackedStatuses.map((name) => ({

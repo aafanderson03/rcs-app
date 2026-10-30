@@ -4,9 +4,7 @@ export type EmployeeIdentity = {
   firstName: string;
   middleName: string;
   lastName: string;
-  /** FIRST MIDDLE LAST */
   fullName: string;
-  /** LAST , FIRST M. — the format used on the printed pay slip */
   listName: string;
   employeeCode: string;
 };
@@ -14,14 +12,12 @@ export type EmployeeIdentity = {
 export type RecordField = { label: string; value: string };
 
 export type RecordGroup =
-  /** Label above value, laid out in a responsive grid. */
   | { kind: 'fields'; title?: string; columns?: number; fields: RecordField[] }
-  /** "Label: value" on one line, e.g. the Yes/No flags. */
   | { kind: 'flags'; title?: string; columns?: number; fields: RecordField[] }
   | { kind: 'table'; title: string; columns: string[]; rows: string[][]; emptyText: string }
   | { kind: 'text'; title: string; text: string };
 
-// Stable 10-digit code so the employee code doesn't change from day to day.
+
 function stableCode(seed: string) {
   let hash = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
@@ -31,10 +27,6 @@ function stableCode(seed: string) {
   return String(((hash >>> 0) % 9000000000) + 1000000000);
 }
 
-/**
- * Builds the demo person from the signed-in user. Only the name comes from the account;
- * everything else on these pages is fictional sample data.
- */
 export function resolveIdentity(
   user?: { displayName?: string; id?: string; username?: string } | null
 ): EmployeeIdentity {
@@ -44,12 +36,12 @@ export function resolveIdentity(
 
   if (raw) {
     if (raw.includes(',')) {
-      // "LAST, FIRST MIDDLE"
+
       const [lastPart, ...rest] = raw.split(',');
       last = lastPart.trim() || last;
       first = rest.join(' ').trim() || first;
     } else {
-      // "First Middle Last": the final word is treated as the last name
+
       const parts = raw.split(/\s+/);
       if (parts.length === 1) {
         first = parts[0];

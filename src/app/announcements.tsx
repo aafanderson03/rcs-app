@@ -9,7 +9,6 @@ import { demoAnnouncements, formatDemoDate } from '@/data/demo-data';
 
 const NEW_WITHIN_DAYS = 2;
 
-// Whole days between an announcement date (YYYY-MM-DD) and today.
 function daysAgo(value: string) {
   const [year, month, day] = value.split('-').map(Number);
   const today = new Date();

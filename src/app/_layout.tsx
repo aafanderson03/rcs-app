@@ -1,3 +1,11 @@
+import { DesktopSidebar } from '@/components/desktop-sidebar';
+import { NotificationBell } from '@/components/notification-bell';
+import { ResponsiveText as Text } from '@/components/responsive-text';
+import { getCompanyBranding } from '@/constants/company-branding';
+import { getPaletteForScheme } from '@/constants/theme';
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
+import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 import {
   Montserrat_400Regular,
   Montserrat_500Medium,
@@ -13,14 +21,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { NotificationBell } from '@/components/notification-bell';
-import { DesktopSidebar } from '@/components/desktop-sidebar';
-import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getCompanyBranding } from '@/constants/company-branding';
-import { getPaletteForScheme } from '@/constants/theme';
-import { AuthProvider, useAuth } from '@/contexts/auth-context';
-import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
-import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 
 const SPLASH_HOLD_DURATION_MS = 750;
 const SPLASH_FADE_DURATION_MS = 250;
@@ -190,10 +190,8 @@ function RootLayoutContent() {
                   )}
                 </Pressable>
               </View>
-              <View style={styles.bellSlot}>
-          <NotificationBell />
-        </View>
               <View style={styles.themeControl}>
+                <NotificationBell />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Switch to ${themeModeLabel(mode === 'light' ? 'dark' : 'light')} theme`}
@@ -316,7 +314,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   brandSubtitle: { color: colors.grayMuted, fontSize: 12 },
   mobileBrandName: { flexShrink: 1, minWidth: 0, marginLeft: 8, color: colors.brownDark, fontSize: 12, fontWeight: '700' },
   brandPressed: { opacity: 0.75 },
-  bellSlot: { position: 'absolute', top: 20, right: 125, zIndex: 30, elevation: 30 },
   menuButton: {
     width: 44,
     height: 44,
@@ -328,7 +325,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   menuButtonPressed: { opacity: 0.7 },
   hamburger: { width: 19, gap: 4 },
   hamburgerLine: { height: 2, borderRadius: 2, backgroundColor: colors.brownDark },
-  themeControl: { zIndex: 4 },
+  themeControl: { flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 4 },
   themeButton: {
     minWidth: 44,
     height: 44,

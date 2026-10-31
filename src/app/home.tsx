@@ -21,6 +21,7 @@ import {
   getDemoAbsenceForKey,
   getDemoMonthlyLateSummary,
   getRecentDemoAttendance,
+  isRestDay,
 } from '@/data/demo-data';
 import { getHolidays, type Holiday } from '@/data/holidays';
 import { getDemoMilestones } from '@/data/milestones';
@@ -175,7 +176,6 @@ export default function HomeScreen() {
     ...getDemoAbsenceDates(calendarMonth),
     ...applications.map((item) => item.submittedAt),
   ];
-  const selectedKey = selectedDate ? dateKey(selectedDate) : '';
   const todayKey = dateKey(today);
   const milestones = getDemoMilestones(today);
   const milestoneCount = isWide ? 12 : isDesktop ? 6 : 5;
@@ -191,7 +191,13 @@ export default function HomeScreen() {
   const paydaySet = new Set([...paydaysAround(calendarMonth), ...paydaysAround(today)].map(dateKey));
   const eventsOn = (key: string): AgendaEvent[] => {
     const absence = getDemoAbsenceForKey(key);
+    const [y, m, d] = key.split('-').map(Number);
+    const restDay = isRestDay(new Date(y, m - 1, d));
     return [
+   
+      restDay
+        ? { label: 'Rest day', note: 'No scheduled shift' }
+        : { label: 'Work shift', note: '8:30 AM – 5:30 PM' },
       ...(holidayIndex.get(key) ?? []).map((holiday) => ({
         label: holiday.name,
         note: `${holiday.scope} · ${holiday.kind}`,
@@ -209,14 +215,19 @@ export default function HomeScreen() {
         .map((item) => ({ label: `${item.type} request`, note: item.status })),
     ];
   };
-  const upcomingLabels = ['Tomorrow', 'The day after', 'In 3 days']; // add or remove entries to change how many days show
+  // Upcoming follows the selected date: it shows the day after whatever is picked
+  const upcomingBase = selectedDate ?? today;
+  const upcomingIsToday = dateKey(upcomingBase) === todayKey;
+  const upcomingLabels = [upcomingIsToday ? 'Tomorrow' : 'Next day'];
   const upcomingDays = upcomingLabels.map((label, index) => {
-    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + index + 1);
+    const date = new Date(upcomingBase.getFullYear(), upcomingBase.getMonth(), upcomingBase.getDate() + index + 1);
     const key = dateKey(date);
     return { label, key, events: eventsOn(key) };
   });
-  const todayEvents = eventsOn(todayKey);
-  const selectedEvents = eventsOn(selectedKey);
+  // The events box follows the selected date (today when nothing is selected)
+  const shownKey = dateKey(upcomingBase);
+  const shownIsToday = upcomingIsToday;
+  const shownEvents = eventsOn(shownKey);
 
   const summaryLine = [
     pendingCount > 0
@@ -273,7 +284,7 @@ export default function HomeScreen() {
         </LinearGradient>
         </View>
 
-        {/* Attendance notice: shown once the monthly lateness limit is passed */}
+       
         {lateSummary.sanction ? (
           <Pressable
             accessibilityRole="button"
@@ -292,7 +303,7 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        {/* At a glance */}
+     
         <View style={[styles.tiles, isMobile && styles.mobileTiles]}>
           {tiles.map((tile) => (
             <Pressable
@@ -309,7 +320,6 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* Quick access */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Quick access</Text>
           <View style={[styles.quickGrid, isDesktop && styles.desktopQuickGrid]}>
@@ -333,7 +343,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Attendance | Announcements + calendar */}
         <View style={[styles.columns, isDesktop && styles.desktopColumns]}>
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
             <View style={styles.columnHeading}>
@@ -394,7 +403,6 @@ export default function HomeScreen() {
                 ))}
               </View>
 
-              {/* This month: late minutes and absences */}
               <View style={styles.monthStrip}>
                 <View style={styles.monthStat}>
                   <Text style={[styles.monthValue, lateSummary.sanctionThresholdReached && styles.monthValueAlert]}>
@@ -463,7 +471,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Calendar | Milestones */}
+      
         <View style={[styles.columns, isDesktop && styles.desktopColumns]}>
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
             <View style={styles.columnHeading}>
@@ -487,19 +495,12 @@ export default function HomeScreen() {
               markedDates={markedDates}
             />
             <View style={styles.eventsBox}>
-              {selectedDate && selectedKey !== todayKey ? (
-                <View style={[styles.eventsSection, styles.selectedSection]}>
-                  <Text style={styles.eventsDate}>
-                    Selected · {formatDemoDate(selectedKey, { weekday: 'long', month: 'long', day: 'numeric' })}
-                  </Text>
-                  <EventList events={selectedEvents} styles={styles} />
-                </View>
-              ) : null}
-
               <View style={styles.eventsSection}>
-                <Text style={styles.eventsDate}>{formattedDate}</Text>
-                <Text style={styles.eventsTitle}>Today’s events</Text>
-                <EventList events={todayEvents} styles={styles} />
+                <Text style={styles.eventsDate}>
+                  {formatDemoDate(shownKey, { weekday: 'long', month: 'long', day: 'numeric' })}
+                </Text>
+                <Text style={styles.eventsTitle}>{shownIsToday ? 'Today’s events' : 'Events'}</Text>
+                <EventList events={shownEvents} styles={styles} />
               </View>
 
               <View style={[styles.eventsSection, styles.upcomingSection]}>
@@ -550,7 +551,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Support */}
+   
         <View style={[styles.support, isMobile && styles.mobileSupport]}>
           <View style={styles.supportCopy}>
             <Text style={styles.supportTitle}>Here when you need us</Text>
@@ -823,7 +824,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     borderColor: colors.border,
   },
   eventsSection: { gap: 2 },
-  selectedSection: { marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   eventsDate: { color: colors.grayMuted, fontSize: 11, fontWeight: '600' },
   eventsTitle: { marginTop: 2, marginBottom: 4, color: colors.text, fontSize: 16, fontWeight: '700' },
   eventsEmpty: { marginTop: 4, color: colors.grayMuted, fontSize: 12 },

@@ -24,6 +24,7 @@ export function getLateSanction(offenseNumber: number) {
 
 export const ALLOWED_LUNCH_MINUTES = 70;
 export const ALLOWED_BREAK_MINUTES = 30;
+export const STANDARD_PAID_DAY_MINUTES = 8 * 60;
 
 const LATE_ARRIVAL_CHANCE = 0.12;
 const LATE_LUNCH_CHANCE = 0.06;
@@ -151,6 +152,8 @@ function buildAbsenceRecord(
   absence: "SIL" | "LWOP",
 ): DemoAttendanceRecord {
   const shiftSpanMinutes = 17 * 60 + 30 - (8 * 60 + 30);
+  const unpaidLunchMinutes = ALLOWED_LUNCH_MINUTES;
+  const scheduledPaidMinutes = STANDARD_PAID_DAY_MINUTES;
   return {
     date: key,
     status: absence,
@@ -160,10 +163,10 @@ function buildAbsenceRecord(
     totalLateMinutes: 0,
     scheduledShift: "8:30 AM – 5:30 PM",
     shiftSpanMinutes,
-    unpaidLunchMinutes: ALLOWED_LUNCH_MINUTES,
+    unpaidLunchMinutes,
     paidBreakMinutes: ALLOWED_BREAK_MINUTES,
-    scheduledPaidMinutes: 8 * 60,
-    paidMinutes: absence === "SIL" ? 8 * 60 : 0,
+    scheduledPaidMinutes,
+    paidMinutes: absence === "SIL" ? scheduledPaidMinutes : 0,
     punches: [],
     totalWorked: formatWorkedTime(0),
   };
@@ -219,9 +222,7 @@ function formatWorkedTime(minutes: number) {
 
 export const formatDemoDuration = formatWorkedTime;
 
-const profileRandom = createDateRandom(
-  `employment-profile-${dateKey(todayStart)}`,
-);
+const profileRandom = createDateRandom("employment-profile-demo-v1");
 
 function chooseDemoValue<T>(values: T[]) {
   return values[Math.floor(profileRandom() * values.length)];
@@ -273,6 +274,37 @@ const demoStore = chooseDemoValue([
   "RCS Demo Store · San Isidro Branch",
 ]);
 const demoManagerName = `${chooseDemoValue(["Rina", "Paolo", "Lara", "Enzo", "Maria", "Juan"])} ${chooseDemoValue(["Santiago", "Reyes", "Cruz", "Mendoza", "Torres", "Gonzales"])}`;
+const demoLocation = chooseDemoValue(["Sample City", "North District", "Central District", "South District"]);
+const demoEmployeeCategory = chooseDemoValue(["STORE OPERATIONS", "CUSTOMER SERVICE", "MERCHANDISING", "INVENTORY"]);
+const demoRank = chooseDemoValue(["RANK AND FILE", "TEAM LEAD", "SUPERVISORY"]);
+const demoJobLevel = chooseDemoValue(["I", "II", "III", "IV"]);
+const demoDivision = chooseDemoValue(["STORE OPERATIONS", "CUSTOMER EXPERIENCE", "RETAIL SUPPORT"]);
+const demoSection = chooseDemoValue(["FRONT END", "STORE SUPPORT", "INVENTORY CONTROL", "SALES FLOOR"]);
+const demoBaseOffice = chooseDemoValue(["000 DEMO HEAD OFFICE", "001 SAMPLE OPERATIONS HUB", "002 DEMO REGIONAL OFFICE"]);
+const demoSalaryClassification = chooseDemoValue(["DAILY RATE", "MONTHLY RATE", "HOURLY RATE"]);
+const demoBasicSalary = (650 + Math.floor(profileRandom() * 11) * 25).toFixed(2);
+const demoStartingSalary = (Number(demoBasicSalary) - 50).toFixed(2);
+const demoBankAccountTail = String(1000 + Math.floor(profileRandom() * 9000));
+const demoEmploymentFlags = ["No", "Yes"] as const;
+const randomDemoFlag = () => chooseDemoValue([...demoEmploymentFlags]);
+const demoEmploymentStatus = chooseDemoValue(["CONTRACTUAL", "PROBATIONARY", "REGULAR"]);
+
+const demoHireDate = new Date(
+  todayStart.getFullYear() - 1 - Math.floor(profileRandom() * 5),
+  Math.floor(profileRandom() * 12),
+  1 + Math.floor(profileRandom() * 27),
+);
+const demoProbationaryDate = new Date(demoHireDate);
+demoProbationaryDate.setMonth(demoProbationaryDate.getMonth() + 6);
+const demoRegularizedDate = new Date(demoHireDate);
+demoRegularizedDate.setFullYear(demoRegularizedDate.getFullYear() + 1);
+const demoContractEndDate = new Date(demoHireDate);
+demoContractEndDate.setFullYear(demoContractEndDate.getFullYear() + 1);
+const formatProfileDate = (date: Date) => formatDemoDate(dateKey(date), {
+  month: "long",
+  day: "2-digit",
+  year: "numeric",
+});
 
 export const demoEmployee = {
   name: `${demoFirstName} ${demoMiddleName} ${demoLastName}`,
@@ -285,7 +317,11 @@ export const demoEmployee = {
   address: "Demo District, Sample City, Philippines",
   designation: demoDesignation,
   department: demoDepartment,
-  dateHired: "June 12, 2022",
+  dateHired: formatProfileDate(demoHireDate),
+  dateApplied: formatProfileDate(new Date(demoHireDate.getFullYear(), demoHireDate.getMonth(), Math.max(1, demoHireDate.getDate() - 14))),
+  probationaryDate: formatProfileDate(demoProbationaryDate),
+  dateRegularized: demoEmploymentStatus === "REGULAR" ? formatProfileDate(demoRegularizedDate) : "-",
+  endOfContract: demoEmploymentStatus === "CONTRACTUAL" ? formatProfileDate(demoContractEndDate) : "-",
   taxStatus: "S/0 · Sample",
   tin: "DEMO-TIN-****",
   sss: "DEMO-SSS-****",
@@ -294,8 +330,47 @@ export const demoEmployee = {
   gsis: "Not applicable · Sample",
   manager: demoManagerName,
   store: demoStore,
-  employmentStatus: "Regular · Sample",
+  employmentStatus: `${demoEmploymentStatus} · SAMPLE`,
   company: "RCS Demo Retail Corporation",
+  location: demoLocation.toUpperCase(),
+  employeeCategory: demoEmployeeCategory,
+  rank: demoRank,
+  jobLevel: demoJobLevel,
+  division: demoDivision,
+  section: demoSection,
+  baseOffice: demoBaseOffice,
+  salaryClassification: demoSalaryClassification,
+  pagIbigCode: chooseDemoValue(["PAG1", "PAG2", "PAG3"]),
+  projectCode: chooseDemoValue(["-", "DEMO-OPS", "SAMPLE-RETAIL"]),
+  basicSalary: demoBasicSalary,
+  startingSalary: demoStartingSalary,
+  memberIdNumber: "DEMO-****",
+  peraaIdNumber: "DEMO-****",
+  bankCode: chooseDemoValue(["DEMO SAVINGS", "SAMPLE BANK", "RETAIL DEMO BANK"]),
+  bankAccountType: chooseDemoValue(["SA", "CA"]),
+  atmAccountNumber: `**** ${demoBankAccountTail}`,
+  employmentFlags: {
+    salaryOnHold: randomDemoFlag(),
+    salaryForCheck: randomDemoFlag(),
+    isContractual: demoEmploymentStatus === "CONTRACTUAL" ? "Yes" : "No",
+    inactiveDevice: randomDemoFlag(),
+    allowedToLogin: randomDemoFlag(),
+    tax: randomDemoFlag(),
+    hrisStatus: randomDemoFlag(),
+    sss: randomDemoFlag(),
+    payrollStatus: randomDemoFlag(),
+    philHealth: randomDemoFlag(),
+    tksStatus: randomDemoFlag(),
+    thirteenthMonth: randomDemoFlag(),
+    unionMember: randomDemoFlag(),
+    pagIbig: randomDemoFlag(),
+    agency: randomDemoFlag(),
+    completionBonus: randomDemoFlag(),
+    confidential: randomDemoFlag(),
+    incentiveLeave: randomDemoFlag(),
+    providentFund: randomDemoFlag(),
+  },
+  employmentRemarks: chooseDemoValue(["Sample profile for demonstration.", "No additional demo remarks.", "Fictional employee record."]),
 };
 
 function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
@@ -325,7 +400,8 @@ function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
       ? ALLOWED_BREAK_MINUTES + 1 + Math.floor(random() * 4)
       : ALLOWED_BREAK_MINUTES - 5 + Math.floor(random() * 6);
   const lunchIn = lunchOut + lunchDuration;
-  const afternoonBreakIn = afternoonBreakOut + breakDuration;
+  const safeBreakOut = Math.min(afternoonBreakOut, 17 * 60 - breakDuration);
+  const afternoonBreakIn = safeBreakOut + breakDuration;
   const clockOut = 17 * 60 + 30;
 
   const lateByMinutes = Math.max(0, clockIn - (8 * 60 + 30));
@@ -336,7 +412,7 @@ function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
   const shiftSpanMinutes = clockOut - (8 * 60 + 30);
   const unpaidLunchMinutes = ALLOWED_LUNCH_MINUTES;
   const paidBreakMinutes = ALLOWED_BREAK_MINUTES;
-  const scheduledPaidMinutes = 8 * 60;
+  const scheduledPaidMinutes = STANDARD_PAID_DAY_MINUTES;
   const paidMinutes = scheduledPaidMinutes - totalLateMinutes;
 
   return {
@@ -359,7 +435,7 @@ function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
       {
         direction: "OUT",
         label: "Afternoon break out",
-        time: formatPunchTime(afternoonBreakOut),
+        time: formatPunchTime(safeBreakOut),
       },
       {
         direction: "IN",

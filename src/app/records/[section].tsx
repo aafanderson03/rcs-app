@@ -38,14 +38,14 @@ const sectionTitles: Record<string, string> = {
 };
 
 export default function EmployeeRecordScreen() {
+  const { user } = useAuth();
   const { colorScheme } = useAppTheme();
   const palette = getPaletteForScheme(colorScheme);
   const styles = useMemo(() => createStyles(palette), [palette]);
-  const { user } = useAuth();
   const { width } = useWindowDimensions();
   const { section } = useLocalSearchParams<{ section: string }>();
   const title = section ? sectionTitles[section] : undefined;
-  const identity = useMemo(() => resolveIdentity(user), [user]);
+  const identity = useMemo(() => resolveIdentity(user?.displayName), [user?.displayName]);
  
   const groups = useMemo<RecordGroup[]>(() => {
     const custom = getEmployeeRecordGroups(section, identity);

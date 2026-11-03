@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { FlatList, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PortalCalendar } from '@/components/portal-ui';
@@ -14,6 +14,7 @@ import { useAppTheme } from '@/contexts/theme-context';
 import {
   dateKey,
   demoAnnouncements,
+  demoEmployee,
   demoLeaveBalances,
   formatDemoDate,
   formatDemoDuration,
@@ -32,7 +33,7 @@ const workspaceContent: Record<EmployeeType, {
   employee: {
     links: [
       { label: 'Attendance & DTR', detail: 'Review attendance and time records', route: '/attendance' },
-      { label: 'Applications', detail: 'Submit or follow up on a request', route: '/applications' },
+      { label: 'Applications', detail: 'Submit a request', route: '/applications' },
       { label: 'Employee inquiry', detail: 'Open your profile and balances', route: '/inquiry/basic-profile' },
     ],
   },
@@ -52,7 +53,7 @@ const workspaceContent: Record<EmployeeType, {
   },
   subcontractor: {
     links: [
-      { label: 'Applications', detail: 'Submit or follow up on a request', route: '/applications' },
+      { label: 'Applications', detail: 'Submit a request', route: '/applications' },
       { label: 'Announcements', detail: 'Read the latest company updates', route: '/announcements' },
       { label: 'Help & guides', detail: 'Find instructions for common requests', route: '/help' },
     ],
@@ -112,7 +113,7 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const isMobile = width < 600;
-  const isWide = isDesktop && width >= 1200; // room for birthdays and anniversaries side by side
+  const isWide = isDesktop && width >= 1200;
   const employeeType = user?.employeeType ?? 'employee';
   const workspace = workspaceContent[employeeType];
   const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
@@ -122,7 +123,7 @@ export default function HomeScreen() {
   const hour = today.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const formattedDate = today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  const firstName = user?.displayName?.trim().split(/\s+/)[0] ?? '';
+  const firstName = user?.displayName.trim().split(/\s+/)[0] ?? demoEmployee.firstName;
 
   const recentAttendance = getRecentDemoAttendance();
   const recentAttendanceDate = recentAttendance
@@ -178,8 +179,6 @@ export default function HomeScreen() {
   ];
   const todayKey = dateKey(today);
   const milestones = getDemoMilestones(today);
-  const milestoneCount = isWide ? 12 : isDesktop ? 6 : 5;
-
   
   const agendaYears = Array.from(new Set([...holidayYears, today.getFullYear(), today.getFullYear() + 1]));
   const holidayIndex = new Map<string, Holiday[]>();
@@ -215,7 +214,7 @@ export default function HomeScreen() {
         .map((item) => ({ label: `${item.type} request`, note: item.status })),
     ];
   };
-  // Upcoming follows the selected date: it shows the day after whatever is picked
+
   const upcomingBase = selectedDate ?? today;
   const upcomingIsToday = dateKey(upcomingBase) === todayKey;
   const upcomingLabels = [upcomingIsToday ? 'Tomorrow' : 'Next day'];
@@ -224,20 +223,16 @@ export default function HomeScreen() {
     const key = dateKey(date);
     return { label, key, events: eventsOn(key) };
   });
-  // The events box follows the selected date (today when nothing is selected)
+
   const shownKey = dateKey(upcomingBase);
   const shownIsToday = upcomingIsToday;
   const shownEvents = eventsOn(shownKey);
 
-  const summaryLine = [
-    pendingCount > 0
-      ? `You have ${pendingCount} pending request${pendingCount === 1 ? '' : 's'} awaiting approval.`
-      : 'You have no pending requests.',
-    `Next payday is ${paydayText}.`,
-    lateSummary.lateMinutes > 0
-      ? `${lateSummary.lateMinutes} late minute${lateSummary.lateMinutes === 1 ? '' : 's'} so far this month.`
-      : 'No late minutes this month.',
-  ].join(' ');
+  // const summaryLine = [
+
+    
+
+  // ].join('\n');
 
   const tiles = [
     { label: 'Pending requests', value: String(pendingCount), caption: 'Review applications', route: '/applications', alert: false },
@@ -280,7 +275,7 @@ export default function HomeScreen() {
           <Text style={[styles.heroTitle, isDesktop && styles.desktopHeroTitle]}>
             {firstName ? `${greeting}, ${firstName}` : greeting}
           </Text>
-          <Text style={styles.heroSummary}>{summaryLine}</Text>
+          <Text style={styles.heroSummary}>Your workday, requests, and updates in one place.</Text>
         </LinearGradient>
         </View>
 
@@ -313,6 +308,7 @@ export default function HomeScreen() {
               onPress={() => router.push(tile.route as never)}
               style={({ pressed }) => [styles.tile, isMobile && styles.mobileTile, pressed && styles.pressed]}
             >
+              <View style={[styles.tileAccent, tile.alert && styles.tileAccentAlert]} />
               <Text style={styles.tileLabel}>{tile.label}</Text>
               <Text style={[styles.tileValue, tile.alert && styles.tileValueAlert]}>{tile.value}</Text>
               <Text style={styles.tileCaption}>{tile.caption}</Text>
@@ -345,7 +341,7 @@ export default function HomeScreen() {
 
         <View style={[styles.columns, isDesktop && styles.desktopColumns]}>
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
-            <View style={styles.columnHeading}>
+            <View style={[styles.columnHeading, isDesktop && styles.desktopColumnHeading]}>
               <View>
                 <Text style={styles.eyebrow}>ATTENDANCE</Text>
                 <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>
@@ -382,6 +378,13 @@ export default function HomeScreen() {
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${hoursRatio * 100}%` }]} />
               </View>
+              {recentAttendance ? (
+                <Text style={styles.hoursMath}>
+                  {formatDemoDuration(recentAttendance.scheduledPaidMinutes)} standard paid day; {formatDemoDuration(recentAttendance.unpaidLunchMinutes)} lunch is unpaid but does not reduce the target. {formatDemoDuration(recentAttendance.paidBreakMinutes)} paid break included; {recentAttendance.totalLateMinutes > 0
+                    ? `${formatDemoDuration(recentAttendance.totalLateMinutes)} late time/overages deducted.`
+                    : 'No late time/overages deducted.'}
+                </Text>
+              ) : null}
               {lateParts.length ? (
                 <View style={styles.chipRow}>
                   {lateParts.map((part) => (
@@ -433,7 +436,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
-            <View style={styles.columnHeading}>
+            <View style={[styles.columnHeading, isDesktop && styles.desktopColumnHeading]}>
               <View>
                 <Text style={styles.eyebrow}>NEWS</Text>
                 <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Announcements</Text>
@@ -474,7 +477,7 @@ export default function HomeScreen() {
       
         <View style={[styles.columns, isDesktop && styles.desktopColumns]}>
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
-            <View style={styles.columnHeading}>
+            <View style={[styles.columnHeading, isDesktop && styles.desktopColumnHeading]}>
               <View>
                 <Text style={styles.eyebrow}>CALENDAR</Text>
                 <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Paydays, absences & requests</Text>
@@ -521,18 +524,18 @@ export default function HomeScreen() {
           </View>
 
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
-            <View style={styles.columnHeading}>
+            <View style={[styles.columnHeading, isDesktop && styles.desktopColumnHeading]}>
               <View>
                 <Text style={styles.eyebrow}>PEOPLE</Text>
                 <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Employee milestones</Text>
               </View>
             </View>
-            <View style={[styles.card, isDesktop && styles.fillCard, isWide && styles.milestonesCard]}>
+            <View style={[styles.card, styles.milestoneListCard, isWide && styles.milestonesCard]}>
               <View style={styles.milestoneCol}>
                 <MilestoneGroup
                   title="Birthdays"
                   styles={styles}
-                  items={milestones.birthdays.slice(0, milestoneCount).map((m) => ({ name: m.name, note: m.date, past: m.past }))}
+                  items={milestones.birthdays.map((m) => ({ name: m.name, note: m.date, past: m.past }))}
                 />
               </View>
               <View style={[styles.milestoneDivider, isWide && styles.milestoneDividerVertical]} />
@@ -540,7 +543,7 @@ export default function HomeScreen() {
                 <MilestoneGroup
                   title="Work anniversaries"
                   styles={styles}
-                  items={milestones.anniversaries.slice(0, milestoneCount).map((m) => ({
+                  items={milestones.anniversaries.map((m) => ({
                     name: m.name,
                     note: `${m.years} yr${m.years === 1 ? '' : 's'} · ${m.date}`,
                     past: m.past,
@@ -634,17 +637,25 @@ function MilestoneGroup({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View>
+    <View style={styles.milestoneGroup}>
       <Text style={styles.milestoneTitle}>{title}</Text>
-      {items.map((item) => (
-        <View key={item.name} style={[styles.milestoneRow, item.past && styles.milestonePast]}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials(item.name)}</Text>
+      <FlatList
+        data={items}
+        keyExtractor={(item, index) => `${item.name}-${item.note}-${index}`}
+        getItemLayout={(_, index) => ({ length: 40, offset: 40 * index, index })}
+        renderItem={({ item }) => (
+          <View style={[styles.milestoneRow, item.past && styles.milestonePast]}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials(item.name)}</Text>
+            </View>
+            <Text style={styles.milestoneName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.milestoneNote}>{item.note}</Text>
           </View>
-          <Text style={styles.milestoneName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.milestoneNote}>{item.note}</Text>
-        </View>
-      ))}
+        )}
+        style={styles.milestoneItems}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+      />
     </View>
   );
 }
@@ -655,16 +666,16 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   desktopContent: { alignSelf: 'center', maxWidth: 1320, padding: 42, paddingBottom: 60 },
 
 
-  heroWrap: { marginBottom: 16, zIndex: 20, elevation: 20 },
+  heroWrap: { marginBottom: 20 },
   desktopHeroWrap: { marginBottom: 20 },
-  hero: { padding: 22, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  desktopHero: { padding: 34 },
+  hero: { padding: 22, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  desktopHero: { padding: 24, borderRadius: 14, borderWidth: 1, borderColor: colors.border },
   introMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   heroEyebrow: { color: '#7A2E24', fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
   heroDate: { color: 'rgba(43,33,24,0.7)', fontSize: 12, fontWeight: '600' },
-  heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 28, fontWeight: '700', letterSpacing: -0.6 },
-  desktopHeroTitle: { fontSize: 38, letterSpacing: -1 },
-  heroSummary: { maxWidth: 680, marginTop: 8, color: 'rgba(43,33,24,0.85)', fontSize: 14, lineHeight: 21 },
+  heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 30, fontWeight: '800', letterSpacing: -0.8 },
+  desktopHeroTitle: { fontSize: 40, letterSpacing: -1.2 },
+  heroSummary: { maxWidth: 680, marginTop: 6, color: 'rgba(43,33,24,0.72)', fontSize: 13, lineHeight: 20 },
 
 
   notice: {
@@ -687,18 +698,25 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   noticeArrow: { color: colors.danger, fontSize: 18 },
 
 
-  tiles: { flexDirection: 'row', gap: 12, marginBottom: 30 },
+  tiles: { flexDirection: 'row', gap: 14, marginBottom: 32 },
   mobileTiles: { flexWrap: 'wrap' },
   tile: {
     flex: 1,
     minWidth: 0,
     padding: 16,
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#292725',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   mobileTile: { flexBasis: '47%', flexGrow: 1 },
+  tileAccent: { width: 28, height: 3, marginBottom: 11, borderRadius: 2, backgroundColor: colors.yellowDeep },
+  tileAccentAlert: { backgroundColor: colors.danger },
   tileLabel: { color: colors.grayMuted, fontSize: 11, fontWeight: '700' },
   tileValue: { marginTop: 8, color: colors.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
   tileValueAlert: { color: colors.danger },
@@ -719,10 +737,15 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     alignItems: 'center',
     gap: 14,
     padding: 16,
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#292725',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
   desktopQuickCard: { flex: 1, minWidth: 0 },
   quickIcon: {
@@ -730,7 +753,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: colors.yellowLight,
   },
   quickGlyph: { color: colors.brown, fontSize: 19, fontWeight: '700' },
@@ -741,17 +764,23 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
 
 
   columns: { gap: 28, marginBottom: 32 },
-  desktopColumns: { flexDirection: 'row', gap: 32 },
+  desktopColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 32 },
   column: { minWidth: 0 },
   desktopColumn: { flex: 1 },
   columnHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 },
+  desktopColumnHeading: { minHeight: 56, alignItems: 'center' },
   panelDate: { color: colors.grayMuted, fontSize: 12 },
   card: {
     padding: 18,
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#292725',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   hoursValue: { color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
@@ -762,6 +791,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   onTimeText: { color: colors.brownDark, fontSize: 12, fontWeight: '700' },
   progressTrack: { height: 8, marginTop: 14, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.grayLight },
   progressFill: { height: '100%', borderRadius: 4, backgroundColor: colors.brown },
+  hoursMath: { marginTop: 10, color: colors.grayMuted, fontSize: 11, lineHeight: 16 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, backgroundColor: colors.grayLight },
   chipText: { color: colors.danger, fontSize: 11, fontWeight: '700' },
@@ -793,18 +823,20 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   cardActionArrow: { marginLeft: 7, color: colors.brown, fontSize: 15 },
 
   milestoneTitle: { marginBottom: 6, color: colors.text, fontSize: 13, fontWeight: '700' },
-  milestoneRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.yellowLight },
+  milestoneRow: { height: 40, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.yellowLight, borderWidth: 1, borderColor: colors.border },
   avatarText: { color: colors.brown, fontSize: 10, fontWeight: '800' },
   milestoneName: { flex: 1, minWidth: 0, color: colors.text, fontSize: 12, fontWeight: '600' },
   milestoneNote: { color: colors.grayMuted, fontSize: 11 },
   milestoneDivider: { height: 1, marginVertical: 14, backgroundColor: colors.border },
   milestoneDividerVertical: { width: 1, height: 'auto', marginVertical: 0, marginHorizontal: 22 },
   milestonesCard: { flexDirection: 'row', alignItems: 'stretch' },
-  fillCard: { flex: 1 },
+  milestoneListCard: { height: 460, minHeight: 0, overflow: 'hidden' },
   milestonePast: { opacity: 0.55 },
 
-  milestoneCol: { flex: 1, minWidth: 0 },
+  milestoneCol: { flex: 1, minWidth: 0, minHeight: 0 },
+  milestoneGroup: { flex: 1, minHeight: 0 },
+  milestoneItems: { flex: 1, minHeight: 0 },
 
   announcement: { paddingVertical: 4 },
   announcementDivider: { marginTop: 12, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
@@ -818,10 +850,15 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   eventsBox: {
     marginTop: 12,
     padding: 16,
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#292725',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
   eventsSection: { gap: 2 },
   eventsDate: { color: colors.grayMuted, fontSize: 11, fontWeight: '600' },
@@ -855,9 +892,9 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   supportTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   supportDescription: { color: colors.grayMuted, fontSize: 12, lineHeight: 18 },
   supportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  helpButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 4, backgroundColor: colors.yellowLight },
+  helpButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 7, backgroundColor: colors.yellowLight },
   helpButtonText: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  ticketButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 4, backgroundColor: colors.brown },
+  ticketButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 7, backgroundColor: colors.brown },
   ticketButtonText: { color: colors.white, fontSize: 13, fontWeight: '700' },
 
   pressed: { opacity: 0.8 },

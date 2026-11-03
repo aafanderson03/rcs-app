@@ -125,6 +125,16 @@ export default function AttendanceScreen() {
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${hoursRatio * 100}%` }]} />
         </View>
+        <View style={styles.hoursMath}>
+          <Text style={styles.hoursMathText}>
+            Standard paid day: {formatDemoDuration(selectedRecord.scheduledPaidMinutes)}. The {formatDemoDuration(selectedRecord.unpaidLunchMinutes)} lunch is unpaid and does not reduce the daily target.
+          </Text>
+          <Text style={styles.hoursMathText}>
+            The {formatDemoDuration(selectedRecord.paidBreakMinutes)} rest break is paid and already included. {selectedRecord.totalLateMinutes > 0
+              ? `Subtract ${formatDemoDuration(selectedRecord.totalLateMinutes)} in late time/overages = ${selectedRecord.totalWorked} paid today.`
+              : `No late time/overages were deducted, so ${selectedRecord.totalWorked} is paid today.`}
+          </Text>
+        </View>
 
         <View style={styles.punchList}>
           {selectedRecord.punches.map((punch) => {
@@ -260,6 +270,8 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     onTimeBadgeText: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '700' },
     progressTrack: { height: 8, marginTop: 14, borderRadius: 4, overflow: 'hidden', backgroundColor: RcsColors.grayLight },
     progressFill: { height: '100%', borderRadius: 4, backgroundColor: RcsColors.brown },
+    hoursMath: { gap: 5, marginTop: 12, padding: 11, borderRadius: 4, backgroundColor: RcsColors.grayLight },
+    hoursMathText: { color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
 
     absenceTitle: { color: RcsColors.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
     absenceNote: { marginTop: 14, color: RcsColors.grayDark, fontSize: 13, lineHeight: 20 },

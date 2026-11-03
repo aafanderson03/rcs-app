@@ -134,7 +134,7 @@ const payslipKeys = {
 
 export default function InquiryScreen() {
   const { user } = useAuth();
-  const identity = resolveIdentity(user);
+  const identity = resolveIdentity(user?.displayName);
   const styles = useInquiryStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;

@@ -18,51 +18,22 @@ export type RecordGroup =
   | { kind: 'text'; title: string; text: string };
 
 
-function stableCode(seed: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return String(((hash >>> 0) % 9000000000) + 1000000000);
-}
-
-export function resolveIdentity(
-  user?: { displayName?: string; id?: string; username?: string } | null
-): EmployeeIdentity {
-  const raw = user?.displayName?.trim();
-  let first = demoEmployee.firstName;
-  let last = demoEmployee.lastName;
-
-  if (raw) {
-    if (raw.includes(',')) {
-
-      const [lastPart, ...rest] = raw.split(',');
-      last = lastPart.trim() || last;
-      first = rest.join(' ').trim() || first;
-    } else {
-
-      const parts = raw.split(/\s+/);
-      if (parts.length === 1) {
-        first = parts[0];
-      } else {
-        last = parts[parts.length - 1];
-        first = parts.slice(0, -1).join(' ');
-      }
-    }
-  }
-
-  const middle = demoEmployee.middleName;
+export function resolveIdentity(displayName?: string): EmployeeIdentity {
+  const nameParts = displayName?.trim().split(/\s+/).filter(Boolean);
+  const first = nameParts?.[0] ?? demoEmployee.firstName;
+  const last = nameParts && nameParts.length > 1 ? nameParts[nameParts.length - 1] : demoEmployee.lastName;
+  const middle = nameParts && nameParts.length > 2
+    ? nameParts.slice(1, -1).join(' ')
+    : '';
   const upper = (value: string) => value.toUpperCase();
-  const seed = user?.id || user?.username;
 
   return {
     firstName: upper(first),
     middleName: upper(middle),
     lastName: upper(last),
-    fullName: upper(`${first} ${middle} ${last}`),
-    listName: upper(`${last} , ${first} ${middle.charAt(0)}.`),
-    employeeCode: seed ? stableCode(seed) : demoEmployee.employeeCode,
+    fullName: upper([first, middle, last].filter(Boolean).join(' ')),
+    listName: upper(`${last} , ${first}${middle ? ` ${middle.charAt(0)}.` : ''}`),
+    employeeCode: demoEmployee.employeeCode,
   };
 }
 
@@ -193,7 +164,6 @@ function personalInformation(identity: EmployeeIdentity): RecordGroup[] {
 }
 
 function employmentInformation(identity: EmployeeIdentity): RecordGroup[] {
-  const headOffice = '000 DEMO HEAD OFFICE';
   return [
     {
       kind: 'fields',
@@ -210,50 +180,50 @@ function employmentInformation(identity: EmployeeIdentity): RecordGroup[] {
         { label: 'First Name', value: identity.firstName },
         { label: 'Middle Name', value: identity.middleName },
         { label: 'Employee Status', value: demoEmployee.employmentStatus.toUpperCase() },
-        { label: 'Location', value: 'SAMPLE CITY' },
-        { label: 'Employee Category', value: '80204 OPERATION' },
-        { label: 'Rank', value: 'RANK AND FILE' },
+        { label: 'Location', value: demoEmployee.location },
+        { label: 'Employee Category', value: demoEmployee.employeeCategory },
+        { label: 'Rank', value: demoEmployee.rank },
         { label: 'Designation', value: demoEmployee.designation.toUpperCase() },
-        { label: 'Job Level', value: 'III' },
-        { label: 'Tax Status', value: '' },
+        { label: 'Job Level', value: demoEmployee.jobLevel },
+        { label: 'Tax Status', value: demoEmployee.taxStatus.toUpperCase() },
         { label: 'Department', value: demoEmployee.department.toUpperCase() },
-        { label: 'Division', value: '6 DEMO DIVISION' },
-        { label: 'Branch', value: headOffice },
-        { label: 'Section', value: '80204 OPERATION' },
-        { label: 'Unit', value: '-' },
-        { label: 'Area', value: '-' },
-        { label: 'Group', value: '-' },
+        { label: 'Division', value: demoEmployee.division },
+        { label: 'Branch', value: demoEmployee.store.toUpperCase() },
+        { label: 'Section', value: demoEmployee.section },
+        { label: 'Unit', value: demoEmployee.section },
+        { label: 'Area', value: demoEmployee.location },
+        { label: 'Group', value: demoEmployee.employeeCategory },
         { label: 'Base Site', value: demoEmployee.designation.toUpperCase() },
         { label: 'Designation Desired', value: '' },
-        { label: 'Pay Location', value: headOffice },
-        { label: 'Timekeep Group', value: headOffice },
-        { label: 'Salary Classification', value: '' },
-        { label: 'Pag-Ibig Code', value: 'PAG1' },
-        { label: 'Project Code', value: '-' },
-        { label: 'Date Applied', value: '' },
+        { label: 'Pay Location', value: demoEmployee.baseOffice },
+        { label: 'Timekeep Group', value: demoEmployee.baseOffice },
+        { label: 'Salary Classification', value: demoEmployee.salaryClassification },
+        { label: 'Pag-Ibig Code', value: demoEmployee.pagIbigCode },
+        { label: 'Project Code', value: demoEmployee.projectCode },
+        { label: 'Date Applied', value: demoEmployee.dateApplied },
         { label: 'Date Hired', value: demoEmployee.dateHired },
-        { label: 'Probationary Date', value: '' },
-        { label: 'Date Regularized', value: '' },
-        { label: 'Date Separated', value: '' },
-        { label: 'End of Contract', value: '' },
-        { label: 'Basic Salary', value: '750.00' },
-        { label: 'Starting Salary', value: '0.00' },
-        { label: 'Member Id No.', value: '' },
-        { label: 'PERAA Id No.', value: '' },
-        { label: 'Bank Code', value: 'DEMO BANK SAVINGS' },
-        { label: 'Bank Account Type', value: 'SA' },
-        { label: 'ATM Account No.', value: '**** 1042' },
+        { label: 'Probationary Date', value: demoEmployee.probationaryDate },
+        { label: 'Date Regularized', value: demoEmployee.dateRegularized },
+        { label: 'Date Separated', value: '-' },
+        { label: 'End of Contract', value: demoEmployee.endOfContract },
+        { label: 'Basic Salary', value: demoEmployee.basicSalary },
+        { label: 'Starting Salary', value: demoEmployee.startingSalary },
+        { label: 'Member Id No.', value: demoEmployee.memberIdNumber },
+        { label: 'PERAA Id No.', value: demoEmployee.peraaIdNumber },
+        { label: 'Bank Code', value: demoEmployee.bankCode },
+        { label: 'Bank Account Type', value: demoEmployee.bankAccountType },
+        { label: 'ATM Account No.', value: demoEmployee.atmAccountNumber },
       ],
     },
     {
       kind: 'flags',
       columns: 3,
       fields: [
-        { label: 'Salary On Hold', value: 'No' },
-        { label: 'Salary for Check', value: 'No' },
-        { label: 'Is Contractual', value: 'No' },
-        { label: 'Inactive Device', value: 'No' },
-        { label: 'Allowed to Login', value: 'No' },
+        { label: 'Salary On Hold', value: demoEmployee.employmentFlags.salaryOnHold },
+        { label: 'Salary for Check', value: demoEmployee.employmentFlags.salaryForCheck },
+        { label: 'Is Contractual', value: demoEmployee.employmentFlags.isContractual },
+        { label: 'Inactive Device', value: demoEmployee.employmentFlags.inactiveDevice },
+        { label: 'Allowed to Login', value: demoEmployee.employmentFlags.allowedToLogin },
       ],
     },
     {
@@ -261,20 +231,20 @@ function employmentInformation(identity: EmployeeIdentity): RecordGroup[] {
       title: 'Exemption Flags',
       columns: 2,
       fields: [
-        { label: 'TAX', value: 'No' },
-        { label: 'HRIS Status', value: 'Yes' },
-        { label: 'SSS', value: 'No' },
-        { label: 'Payroll Status', value: 'Yes' },
-        { label: 'PhilHealth', value: 'No' },
-        { label: 'TKS Status', value: 'Yes' },
-        { label: '13th Month Pay', value: 'No' },
-        { label: 'Union Member', value: 'No' },
-        { label: 'Pag-Ibig', value: 'No' },
-        { label: 'Agency', value: 'No' },
-        { label: 'Completion Bonus', value: 'No' },
-        { label: 'Confidential', value: 'No' },
-        { label: 'Incentive Leave', value: 'No' },
-        { label: 'Provident Fund', value: 'No' },
+        { label: 'TAX', value: demoEmployee.employmentFlags.tax },
+        { label: 'HRIS Status', value: demoEmployee.employmentFlags.hrisStatus },
+        { label: 'SSS', value: demoEmployee.employmentFlags.sss },
+        { label: 'Payroll Status', value: demoEmployee.employmentFlags.payrollStatus },
+        { label: 'PhilHealth', value: demoEmployee.employmentFlags.philHealth },
+        { label: 'TKS Status', value: demoEmployee.employmentFlags.tksStatus },
+        { label: '13th Month Pay', value: demoEmployee.employmentFlags.thirteenthMonth },
+        { label: 'Union Member', value: demoEmployee.employmentFlags.unionMember },
+        { label: 'Pag-Ibig', value: demoEmployee.employmentFlags.pagIbig },
+        { label: 'Agency', value: demoEmployee.employmentFlags.agency },
+        { label: 'Completion Bonus', value: demoEmployee.employmentFlags.completionBonus },
+        { label: 'Confidential', value: demoEmployee.employmentFlags.confidential },
+        { label: 'Incentive Leave', value: demoEmployee.employmentFlags.incentiveLeave },
+        { label: 'Provident Fund', value: demoEmployee.employmentFlags.providentFund },
       ],
     },
     {
@@ -284,7 +254,7 @@ function employmentInformation(identity: EmployeeIdentity): RecordGroup[] {
       rows: [],
       emptyText: 'No data available in table',
     },
-    { kind: 'text', title: 'Remarks', text: 'SAMPLE' },
+    { kind: 'text', title: 'Remarks', text: demoEmployee.employmentRemarks },
   ];
 }
 

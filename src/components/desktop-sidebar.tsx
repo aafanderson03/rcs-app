@@ -232,7 +232,7 @@ export function DesktopSidebar({
 
       <View style={styles.versionFooter}>
         <View style={styles.accountSummary}>
-          <Text style={styles.accountName} numberOfLines={1}>{user?.displayName || 'Employee'}</Text>
+          <Text style={styles.accountName} numberOfLines={1}>{user?.displayName}</Text>
           <Text style={styles.version} numberOfLines={1}>{companyBranding.name}</Text>
         </View>
         <Pressable accessibilityRole="button" onPress={async () => { await signOut(); router.replace('/'); }} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressedLink]}>

@@ -104,8 +104,10 @@ export default function HomeScreen() {
   const paydayText = payday.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const paydayCaption =
     payday.days === 0 ? 'Today' : payday.days === 1 ? 'Tomorrow' : `In ${payday.days} days`;
-  const vacation = demoLeaveBalances.find((item) => item.type === 'Vacation Leave');
-  const vacationLeft = vacation ? (Number(vacation.total) - Number(vacation.used)).toFixed(1) : '—';
+  const serviceIncentiveLeave = demoLeaveBalances.find((item) => item.type === 'Service Incentive Leave');
+  const serviceIncentiveLeaveLeft = serviceIncentiveLeave
+    ? (Number(serviceIncentiveLeave.total) - Number(serviceIncentiveLeave.used)).toFixed(1)
+    : '—';
   const lateSummary = getDemoMonthlyLateSummary(today);
   const absenceTotal = lateSummary.silDays + lateSummary.lwopDays;
 
@@ -185,7 +187,7 @@ export default function HomeScreen() {
   const tiles = [
     { label: 'Pending requests', value: String(pendingCount), caption: 'Review applications', route: '/applications', alert: false },
     { label: 'Next payday', value: paydayText, caption: paydayCaption, route: '/inquiry/pay-slip', alert: false },
-    { label: 'Vacation leave left', value: vacationLeft, caption: 'days this year', route: '/inquiry/leave-balances', alert: false },
+    { label: 'SIL left', value: serviceIncentiveLeaveLeft, caption: 'days this year', route: '/inquiry/leave-balances', alert: false },
     {
       label: 'Late this month',
       value: String(lateSummary.lateDays),

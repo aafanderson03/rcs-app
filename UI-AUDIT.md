@@ -21,8 +21,9 @@ one item at a time; keep later items queued until the current item is verified.
 - [x] **5. Explain Attendance calendar dates** — Label work/rest days, shift
   schedules, and holidays directly in the full-width calendar. Selecting a date
   opens its punch record in a modal.
-- [ ] **6. Improve mobile balance tables** — Use compact row/card layouts for
-  Leave and Loan balances on narrow screens while retaining desktop tables.
+- [x] **6. Improve balance layouts across mobile and web** — Use compact cards
+  for Leave and Loan balances on all platforms, with a two-column web layout on
+  wide screens.
 - [x] **7. Improve announcement and Help discovery** — Announcements can be
   searched and filtered by category, cards open the full notice, Help results
   show content previews, and future-dated announcements are not labeled NEW.
@@ -32,6 +33,13 @@ one item at a time; keep later items queued until the current item is verified.
 - [ ] **9. Keep the legacy portal prototype-only until HTTPS is available** —
   Continue to restrict the HTTP endpoint to test use; require HTTPS before any
   real employee credentials or broader release.
+- [ ] **10. Improve the compact mobile header** — The company name is truncated
+  to one line beside the logo, profile photo, notifications, and theme control.
+  Keep the full company identity accessible while reducing visual clipping on
+  narrow phones.
+- [ ] **11. Clarify long application forms** — Add progress/context and
+  field-level validation feedback so users can understand required information
+  and correct errors before submitting.
 
 ## Audit notes
 
@@ -51,7 +59,8 @@ one item at a time; keep later items queued until the current item is verified.
   accessible detail modal. Search and category filters are available; future
   notices are excluded from the NEW badge.
 - **Profile, balances, payslip, and employee records:** Clear data presentation;
-  mobile tables are the main responsive opportunity.
+  leave and loan balances use cards on all platforms, with a two-column layout
+  on wide web screens.
 - **Help:** Compact searchable article pattern opens full content in a modal;
   search results now include a readable content preview.
 - **Legacy portal, Other URLs, and Workspace:** The Support navigation label
@@ -70,9 +79,9 @@ distinction explicit until live employee systems are connected.
   content previews. These changes complete item 7 above. The current source
   contains demo notice text only; original uploaded documents still need to be
   connected from the eventual file/storage source.
-- **Next responsive improvement:** Leave and loan balances still use wide,
-  horizontally scrollable tables on phones. Prefer compact cards or rows below
-  the mobile breakpoint while retaining the desktop table.
+- **Responsive improvement completed:** Item 6 replaces leave and loan tables
+  with compact cards on all platforms; wide web views show two columns. The
+  compact mobile header remains a follow-up.
 - **Workspace behavior:** Role-specific workspace screens and links exist, but
   authenticated `/workspace/...` visits are redirected to Home. Decide whether
   to expose those screens or retire the route before investing in them.
@@ -82,3 +91,11 @@ distinction explicit until live employee systems are connected.
 - **Live-data states:** No employee-system data source is connected yet. Add
   loading, error, empty, and last-updated states when the live integration is
   introduced; continue labeling current sample content as fictional.
+- **Mobile header:** The company name currently uses a single truncated line
+  alongside the logo and account controls. Preserve access to the full name
+  while refining the layout at narrow phone widths.
+- **Applications:** Long request forms can be easier to complete with explicit
+  progress/context and field-level validation feedback before submission.
+- **Leave and loan balances:** Item 6 is complete. Narrow screens now show
+  balance cards with remaining/owed amounts and supporting details; web uses
+  the same card design and arranges cards in two columns on wide screens.

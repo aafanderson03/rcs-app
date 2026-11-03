@@ -13,7 +13,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 const inquirySections = {
   'basic-profile': {
@@ -52,15 +52,6 @@ const profileFields = [
   'PhilHealth number',
   'GSIS number',
 ];
-const leaveColumns = [
-  'Leave type',
-  'Used leave',
-  'Total leave',
-  'From',
-  'To',
-  'Last updated',
-  'Charged to',
-];
 const leaveTypes = [
   'All',
   'Bereavement Leave',
@@ -76,13 +67,6 @@ const leaveTypes = [
   'Solo Parent Leave',
   'Service Incentive Leave',
   'Vacation Leave',
-];
-const loanColumns = [
-  'Loan type',
-  'Total amount',
-  'Loan date',
-  'Salary deduction',
-  'Loan balance',
 ];
 const loanTypes = [
   'All',
@@ -140,6 +124,7 @@ export default function InquiryScreen() {
   const identity = resolveIdentity(user?.displayName, user?.company.slug, user?.username);
   const styles = useInquiryStyles();
   const { width } = useWindowDimensions();
+  const wideBalanceCards = Platform.OS === 'web' && width >= 960;
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const { section: rawSection } = useLocalSearchParams<{ section: string }>();
   const section =
@@ -307,7 +292,13 @@ const [typeFilter, setTypeFilter] = useState('All');
               onChange={setTypeFilter}
             />
           </View>
-          <DataTable columns={leaveColumns} rows={demoLeaveBalances.filter((row) => typeFilter === 'All' || row.type === typeFilter).map((row) => [row.type, row.used, row.total, row.from, row.to, formatDemoDate(row.updated), row.chargedTo])} />
+          <BalanceCards
+            kind="leave"
+            wide={wideBalanceCards}
+            rows={demoLeaveBalances
+              .filter((row) => typeFilter === 'All' || row.type === typeFilter)
+              .map((row) => [row.type, row.used, row.total, row.from, row.to, formatDemoDate(row.updated), row.chargedTo])}
+          />
         </View>
       ) : null}
 
@@ -321,7 +312,13 @@ const [typeFilter, setTypeFilter] = useState('All');
               onChange={setTypeFilter}
             />
           </View>
-          <DataTable columns={loanColumns} rows={demoLoans.filter((row) => typeFilter === 'All' || row.type === typeFilter).map((row) => [row.type, row.total, formatDemoDate(row.date), row.deduction, row.balance])} />
+          <BalanceCards
+            kind="loan"
+            wide={wideBalanceCards}
+            rows={demoLoans
+              .filter((row) => typeFilter === 'All' || row.type === typeFilter)
+              .map((row) => [row.type, row.total, formatDemoDate(row.date), row.deduction, row.balance])}
+          />
         </View>
       ) : null}
 
@@ -389,20 +386,50 @@ const [typeFilter, setTypeFilter] = useState('All');
   );
 }
 
-function DataTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
+function BalanceCards({ kind, rows, wide = false }: { kind: 'leave' | 'loan'; rows: string[][]; wide?: boolean }) {
   const styles = useInquiryStyles();
-  const { width } = useWindowDimensions();
+  const isLeave = kind === 'leave';
+
   return (
-    <View style={styles.tableCard}>
-      {width < 600 ? <Text style={styles.tableHint}>Swipe sideways to view all columns</Text> : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.tableScroll}>
-  <View style={[styles.tableContent, { minWidth: columns.length * 125 }]}>
-          <View style={styles.tableHeader}>
-            {columns.map((column) => <Text key={column} style={styles.tableHeading}>{column}</Text>)}
+    <View style={[styles.balanceCards, wide && styles.wideBalanceCards]}>
+      {rows.map((row, index) => {
+        const remaining = isLeave ? Number(row[2]) - Number(row[1]) : 0;
+        const balance = isLeave ? `${remaining.toFixed(1)} days` : row[4] || '—';
+        const details = isLeave
+          ? [
+              ['Used', `${row[1]} of ${row[2]} days`],
+              ['From', formatDemoDate(row[3])],
+              ['To', formatDemoDate(row[4])],
+              ['Updated', row[5]],
+              ['Charged to', row[6]],
+            ]
+          : [
+              ['Original amount', row[1]],
+              ['Loan date', row[2]],
+              ['Deduction', row[3]],
+            ];
+
+        return (
+          <View key={`${row[0]}-${index}`} style={[styles.balanceCard, wide && styles.wideBalanceCard]}>
+            <View style={styles.balanceCardHeading}>
+              <Text style={styles.balanceCardTitle}>{row[0]}</Text>
+              <View style={styles.balanceAmount}>
+                <Text style={styles.balanceAmountLabel}>{isLeave ? 'Remaining' : 'Balance'}</Text>
+                <Text style={styles.balanceAmountValue}>{balance}</Text>
+              </View>
+            </View>
+            {details.map(([label, value]) => (
+              <View key={label} style={styles.balanceDetail}>
+                <Text style={styles.balanceDetailLabel}>{label}</Text>
+                <Text style={styles.balanceDetailValue}>{value || '—'}</Text>
+              </View>
+            ))}
           </View>
-          {rows.map((row, rowIndex) => <View key={`${row[0]}-${rowIndex}`} style={styles.tableRow}>{row.map((value, index) => <Text key={`${index}-${value}`} style={styles.tableCell}>{value}</Text>)}</View>)}
-        </View>
-      </ScrollView>
+        );
+      })}
+      {!rows.length ? (
+        <Text style={styles.balanceEmpty}>No {isLeave ? 'leave' : 'loan'} balances match this type.</Text>
+      ) : null}
     </View>
   );
 }
@@ -491,26 +518,34 @@ printError: { marginTop: -8, marginBottom: 14, color: RcsColors.danger, fontSize
   fieldLabel: { color: RcsColors.grayMuted, fontSize: 11, fontWeight: '700' },
   fieldValue: { marginTop: 7, color: RcsColors.text, fontSize: 13, fontWeight: '600' },
   
-  tableScroll: { flexGrow: 1 },
-tableContent: { flexGrow: 1, paddingBottom: 3 },
-tableHeading: { flex: 1, minWidth: 125, paddingRight: 8, color: RcsColors.grayDark, fontSize: 15, fontWeight: '700', alignSelf: 'center' },
-tableCell: { flex: 1, minWidth: 125, paddingRight: 8, color: RcsColors.text, fontSize: 14, lineHeight: 16 },
-  tableCard: {
+  balanceCards: { gap: 12 },
+  wideBalanceCards: { flexDirection: 'row', flexWrap: 'wrap' },
+  balanceCard: {
     padding: 16,
     borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
-  tableHint: { marginBottom: 10, color: RcsColors.grayMuted, fontSize: 11 },
-  tableHeader: {
+  wideBalanceCard: { flexBasis: '48%', flexGrow: 0, minWidth: 300 },
+  balanceCardHeading: {
     flexDirection: 'row',
-    paddingBottom: 10,
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingBottom: 12,
+    marginBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: RcsColors.border,
   },
-  tableRow: { flexDirection: 'row', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
+  balanceCardTitle: { flex: 1, color: RcsColors.text, fontSize: 15, lineHeight: 21, fontWeight: '800' },
+  balanceAmount: { alignItems: 'flex-end' },
+  balanceAmountLabel: { color: RcsColors.grayMuted, fontSize: 10, fontWeight: '700' },
+  balanceAmountValue: { marginTop: 3, color: RcsColors.brown, fontSize: 16, fontWeight: '800' },
+  balanceDetail: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
+  balanceDetailLabel: { flex: 1, color: RcsColors.grayMuted, fontSize: 11, fontWeight: '600' },
+  balanceDetailValue: { flex: 1, color: RcsColors.text, fontSize: 11, fontWeight: '600', textAlign: 'right' },
+  balanceEmpty: { padding: 16, color: RcsColors.grayMuted, fontSize: 13 },
   fieldSubtext: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 11 },  
   
 });

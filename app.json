@@ -37,6 +37,12 @@
       ],
       "expo-font",
       "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow RCS Employee to use a photo as your profile picture."
+        }
+      ],
       ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
     ],
     "experiments": {

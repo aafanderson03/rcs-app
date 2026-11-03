@@ -3,7 +3,7 @@ import { NotificationBell } from '@/components/notification-bell';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
-import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { AuthProvider, useAuth, type ProfilePictureSource } from '@/contexts/auth-context';
 import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
 import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
 import {
@@ -13,6 +13,7 @@ import {
   Montserrat_700Bold,
   Montserrat_800ExtraBold,
 } from '@expo-google-fonts/montserrat';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
 import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
@@ -22,8 +23,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-const SPLASH_HOLD_DURATION_MS = 750;
+const SPLASH_HOLD_DURATION_MS = 3250;
 const SPLASH_FADE_DURATION_MS = 250;
+const DESKTOP_LAYOUT_BREAKPOINT = 1200;
+
+const mobileTabs = [
+  { label: 'Home', glyph: '⌂', route: '/home' },
+  { label: 'Time', glyph: '◷', route: '/attendance' },
+  { label: 'Requests', glyph: '▤', route: '/applications' },
+  { label: 'Updates', glyph: '◉', route: '/announcements' },
+] as const;
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch((error: unknown) => {
@@ -45,7 +54,7 @@ export default function RootLayout() {
 
 function RootLayoutContent() {
   const { colorScheme, mode, setMode, storageError } = useAppTheme();
-  const { user } = useAuth();
+  const { user, profilePicture } = useAuth();
   const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
   const [fontsLoaded, fontError] = useFonts({
     Montserrat_400Regular,
@@ -60,11 +69,11 @@ function RootLayoutContent() {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [desktopSidebarVisible, setDesktopSidebarVisible] = useState(true);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashProgress] = useState(() => new Animated.Value(0));
   const [splashOpacity] = useState(() => new Animated.Value(1));
-  const isDesktop = Platform.OS === 'web' && width >= 960;
+  const isDesktop = Platform.OS === 'web' && width >= DESKTOP_LAYOUT_BREAKPOINT;
   const fontReady = Platform.OS === 'web' || fontsLoaded || fontError !== null;
   const isPublicPage = pathname === '/' || pathname === '/login' || !user;
   const theme = {
@@ -131,39 +140,28 @@ function RootLayoutContent() {
       <SafeAreaProvider>
         <SafeAreaView style={[styles.root, isDesktop && styles.desktopRoot]} edges={['top']}>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          {!isPublicPage && isDesktop && desktopSidebarVisible ? <DesktopSidebar /> : null}
+          <View style={[styles.workspaceBody, isDesktop && styles.desktopWorkspaceBody]}>
+          {!isPublicPage && isDesktop ? (
+            <DesktopSidebar
+              desktopRail
+              collapsed={desktopSidebarCollapsed}
+              companyName={companyBranding.name}
+              logo={companyBranding.logo}
+              onToggleCollapsed={() => setDesktopSidebarCollapsed((collapsed) => !collapsed)}
+            />
+          ) : null}
           <View style={styles.mainColumn}>
-            {!isPublicPage ? <View style={[styles.topBar, isDesktop && styles.desktopTopBar]}>
+            {!isPublicPage && isDesktop ? (
+              <DesktopHeader
+                mode={mode}
+                displayName={user?.displayName ?? ''}
+                employeeType={user?.employeeType ?? 'employee'}
+                profilePicture={profilePicture}
+                onToggleTheme={() => setMode(mode === 'light' ? 'dark' : 'light')}
+              />
+            ) : null}
+            {!isPublicPage && !isDesktop ? <View style={styles.topBar}>
               <View style={styles.brandGroup}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    isDesktop
-                      ? desktopSidebarVisible
-                        ? 'Hide navigation sidebar'
-                        : 'Show navigation sidebar'
-                      : menuOpen
-                        ? 'Close navigation menu'
-                        : 'Open navigation menu'
-                  }
-                  accessibilityState={{
-                    expanded: isDesktop ? desktopSidebarVisible : menuOpen,
-                  }}
-                  onPress={() => {
-                    if (isDesktop) {
-                      setDesktopSidebarVisible((visible) => !visible);
-                    } else {
-                      setMenuOpen((open) => !open);
-                    }
-                  }}
-                  style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}
-                >
-                  <View style={styles.hamburger}>
-                    <View style={styles.hamburgerLine} />
-                    <View style={styles.hamburgerLine} />
-                    <View style={styles.hamburgerLine} />
-                  </View>
-                </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Go to home"
@@ -173,23 +171,40 @@ function RootLayoutContent() {
                   }}
                   style={({ pressed }) => [styles.brand, pressed && styles.brandPressed]}
                 >
-                  <Image
-                    source={companyBranding.logo}
-                    contentFit="contain"
-                    style={[styles.brandLogo, isDesktop && styles.desktopBrandLogo]}
-                    accessibilityLabel={`${companyBranding.name} home`}
-                  />
-                  {isDesktop ? <View style={styles.brandDivider} /> : null}
-                  {isDesktop ? (
-                    <View style={styles.brandCopy}>
-                      <Text style={styles.brandTitle}>Employee Portal</Text>
-                      <Text style={styles.brandSubtitle} numberOfLines={1}>{companyBranding.name}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.mobileBrandName} numberOfLines={1}>{companyBranding.name}</Text>
-                  )}
+                  <View style={styles.mobileBrandLogoFrame}>
+                    <Image
+                      source={companyBranding.logo}
+                      contentFit="contain"
+                      style={styles.brandLogo}
+                      accessibilityLabel={`${companyBranding.name} home`}
+                    />
+                  </View>
+                  <Text style={styles.mobileBrandName} numberOfLines={1}>{companyBranding.name}</Text>
                 </Pressable>
               </View>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Open Basic Profile for ${user?.displayName ?? 'employee'}`}
+                accessibilityHint="Opens your basic employee profile"
+                onPress={() => {
+                  setMenuOpen(false);
+                  router.push({ pathname: '/inquiry/[section]', params: { section: 'basic-profile' } });
+                }}
+                style={({ pressed }) => [styles.mobileProfileButton, pressed && styles.menuButtonPressed]}
+              >
+                <View style={styles.mobileProfileAvatar}>
+                  {profilePicture ? (
+                    <Image
+                      source={profilePicture}
+                      contentFit="cover"
+                      style={styles.mobileProfileImage}
+                      accessibilityLabel="Profile picture"
+                    />
+                  ) : (
+                    <Text style={styles.mobileProfileInitials}>{getInitials(user?.displayName ?? '')}</Text>
+                  )}
+                </View>
+              </Pressable>
               <View style={styles.themeControl}>
                 <NotificationBell />
                 <Pressable
@@ -200,9 +215,6 @@ function RootLayoutContent() {
                   style={({ pressed }) => [styles.themeButton, pressed && styles.menuButtonPressed]}
                 >
                   <Text style={styles.themeButtonText}>{mode === 'light' ? '☾' : '☀'}</Text>
-                  {isDesktop ? (
-                    <Text style={styles.themeButtonText}>{themeModeLabel(mode)}</Text>
-                  ) : null}
                 </Pressable>
               </View>
             </View> : null}
@@ -221,7 +233,6 @@ function RootLayoutContent() {
                 <Stack.Screen name="announcements" />
                 <Stack.Screen name="attendance" />
                 <Stack.Screen name="applications" />
-                <Stack.Screen name="ticket" />
                 <Stack.Screen name="dtr" />
                 <Stack.Screen name="help" />
                 <Stack.Screen name="other-urls" />
@@ -229,6 +240,50 @@ function RootLayoutContent() {
                 <Stack.Screen name="records/[section]" />
               </Stack>
             </View>
+            {!isPublicPage && !isDesktop ? (
+              <SafeAreaView style={styles.mobileNavSafeArea} edges={['bottom']}>
+              <View style={styles.mobileNav} accessibilityRole="tablist">
+                {mobileTabs.map((item) => {
+                  const active = pathname === item.route;
+                  return (
+                    <Pressable
+                      key={item.route}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => {
+                        setMenuOpen(false);
+                        router.replace(item.route);
+                      }}
+                      style={({ pressed }) => [
+                        styles.mobileNavItem,
+                        active && styles.mobileNavItemActive,
+                        pressed && styles.menuButtonPressed,
+                      ]}
+                    >
+                      <Text style={[styles.mobileNavGlyph, active && styles.mobileNavTextActive]}>{item.glyph}</Text>
+                      <Text style={[styles.mobileNavText, active && styles.mobileNavTextActive]}>{item.label}</Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: menuOpen }}
+                  accessibilityLabel="More employee services"
+                  onPress={() => setMenuOpen((open) => !open)}
+                  style={({ pressed }) => [
+                    styles.mobileNavItem,
+                    menuOpen && styles.mobileNavItemActive,
+                    pressed && styles.menuButtonPressed,
+                  ]}
+                >
+                  <Text style={[styles.mobileNavGlyph, menuOpen && styles.mobileNavTextActive]}>•••</Text>
+                  <Text style={[styles.mobileNavText, menuOpen && styles.mobileNavTextActive]}>More</Text>
+                </Pressable>
+              </View>
+              </SafeAreaView>
+            ) : null}
+            {!isPublicPage && isDesktop ? <DesktopFooter companyName={companyBranding.name} /> : null}
+          </View>
           </View>
           {!isPublicPage && !isDesktop && menuOpen ? (
             <View style={styles.drawerLayer}>
@@ -287,39 +342,221 @@ function themeModeLabel(mode: ThemeMode) {
   return mode === 'light' ? 'Light' : 'Dark';
 }
 
+function DesktopHeader({
+  mode,
+  displayName,
+  employeeType,
+  profilePicture,
+  onToggleTheme,
+}: {
+  mode: ThemeMode;
+  displayName: string;
+  employeeType: string;
+  profilePicture: ProfilePictureSource | null;
+  onToggleTheme: () => void;
+}) {
+  const { colorScheme } = useAppTheme();
+  const router = useRouter();
+  const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
+  const initials = getInitials(displayName);
+  const employeeLabel = employeeType.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+  return (
+    <LinearGradient
+      colors={['#F9DF8A', '#D6A52F']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.desktopHeader}
+      accessibilityLabel="Page controls"
+    >
+      <View style={styles.desktopHeaderStart}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Open Basic Profile for ${displayName}`}
+          onPress={() => router.push({ pathname: '/inquiry/[section]', params: { section: 'basic-profile' } })}
+          style={({ hovered, pressed }) => [
+            styles.desktopProfileButton,
+            hovered && styles.desktopProfileButtonHovered,
+            pressed && styles.menuButtonPressed,
+          ]}
+        >
+          <View style={styles.desktopProfileAvatar}>
+            {profilePicture ? (
+              <Image
+                source={profilePicture}
+                contentFit="cover"
+                style={styles.desktopProfileImage}
+                accessibilityLabel="Profile picture"
+              />
+            ) : (
+              <Text style={styles.desktopProfileInitials}>{initials}</Text>
+            )}
+          </View>
+          <View style={styles.desktopProfileCopy}>
+            <Text style={styles.desktopProfileName} numberOfLines={1}>{displayName}</Text>
+            <Text style={styles.desktopProfileRole} numberOfLines={1}>{employeeLabel}</Text>
+          </View>
+        </Pressable>
+      </View>
+      <View style={styles.desktopHeaderActions}>
+        <NotificationBell />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Switch to ${themeModeLabel(mode === 'light' ? 'dark' : 'light')} theme`}
+          accessibilityHint="Switches between Light and Dark themes"
+          onPress={onToggleTheme}
+          style={({ pressed }) => [styles.desktopThemeButton, pressed && styles.menuButtonPressed]}
+        >
+          <Text style={styles.desktopThemeIcon}>{mode === 'light' ? '☾' : '☀'}</Text>
+          <Text style={styles.desktopThemeLabel}>{themeModeLabel(mode)}</Text>
+        </Pressable>
+      </View>
+    </LinearGradient>
+  );
+}
+
+function getInitials(displayName: string) {
+  return displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] ?? '')
+    .join('')
+    .toUpperCase() || '?';
+}
+
+function DesktopFooter({ companyName }: { companyName: string }) {
+  const { colorScheme } = useAppTheme();
+  const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
+  return (
+    <View style={styles.desktopFooter}>
+      <Text style={styles.desktopFooterText}>© {new Date().getFullYear()} {companyName}</Text>
+      <Text style={styles.desktopFooterText}>Employee Self-Service Portal</Text>
+    </View>
+  );
+}
+
 const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  desktopRoot: { flexDirection: 'row' },
-  mainColumn: { flex: 1, minWidth: 0 },
-  topBar: {
-    height: 72,
+  desktopRoot: { flexDirection: 'row', alignItems: 'stretch' },
+  workspaceBody: { flex: 1, minHeight: 0, minWidth: 0 },
+  desktopWorkspaceBody: { flexDirection: 'row', alignItems: 'stretch' },
+  desktopHeader: {
+    minHeight: 70,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
+    backgroundColor: colors.yellow,
+    borderBottomWidth: 1,
+    borderBottomColor: '#BD8D22',
+    zIndex: 10,
+  },
+  desktopHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 0, zIndex: 11 },
+  desktopHeaderStart: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
+  desktopProfileButton: {
+    alignSelf: 'flex-start',
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+  },
+  desktopProfileButtonHovered: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  desktopProfileAvatar: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 11,
+    backgroundColor: colors.yellowLight,
+  },
+  desktopProfileImage: { width: '100%', height: '100%' },
+  desktopProfileInitials: { color: colors.brown, fontSize: 12, fontWeight: '800' },
+  desktopProfileCopy: { maxWidth: 150, gap: 2 },
+  desktopProfileName: { color: '#292725', fontSize: 12, fontWeight: '800' },
+  desktopProfileRole: { color: '#51422A', fontSize: 10, textTransform: 'capitalize' },
+  desktopThemeButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    backgroundColor: colors.grayLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  desktopThemeIcon: { color: colors.brownDark, fontSize: 18, fontWeight: '700' },
+  desktopThemeLabel: { color: colors.brownDark, fontSize: 12, fontWeight: '700' },
+  desktopFooter: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 24,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  desktopFooterText: { color: colors.grayMuted, fontSize: 11 },
+  mainColumn: { flex: 1, minWidth: 0, minHeight: 0, backgroundColor: colors.background },
+  topBar: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 20,
     backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     zIndex: 2,
   },
-  desktopTopBar: { height: 84, paddingHorizontal: 28 },
   brandGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
-  brand: { height: 68, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
-  brandLogo: { width: 112, height: 64, borderRadius: 4 },
-  desktopBrandLogo: { width: 112, height: 64 },
-  brandDivider: { width: 1, height: 38, marginHorizontal: 18, backgroundColor: colors.border },
-  brandCopy: { flexShrink: 1, gap: 3 },
-  brandTitle: { color: colors.brownDark, fontSize: 15, fontWeight: '800' },
-  brandSubtitle: { color: colors.grayMuted, fontSize: 12 },
-  mobileBrandName: { flexShrink: 1, minWidth: 0, marginLeft: 8, color: colors.brownDark, fontSize: 12, fontWeight: '700' },
+  brand: { minHeight: 68, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
+  mobileBrandLogoFrame: {
+    width: 68,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 3,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  brandLogo: { width: '100%', height: '100%' },
+  mobileBrandName: { flexShrink: 1, minWidth: 0, marginLeft: 10, color: colors.text, fontSize: 13, fontWeight: '800' },
   brandPressed: { opacity: 0.75 },
+  mobileProfileButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  mobileProfileAvatar: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 19,
+    backgroundColor: colors.yellowLight,
+  },
+  mobileProfileInitials: { color: colors.brown, fontSize: 12, fontWeight: '800' },
+  mobileProfileImage: { width: '100%', height: '100%' },
   menuButton: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 14,
     backgroundColor: colors.grayLight,
   },
   menuButtonPressed: { opacity: 0.7 },
@@ -334,7 +571,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
-    borderRadius: 4,
+    borderRadius: 14,
     backgroundColor: colors.grayLight,
   },
   themeButtonText: { color: colors.brownDark, fontSize: 14, fontWeight: '700' },
@@ -347,6 +584,31 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   },
   storageError: { color: colors.brownDark, fontSize: 12, lineHeight: 17 },
   routeContainer: { flex: 1, minWidth: 0 },
+  mobileNavSafeArea: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  mobileNav: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-around',
+    paddingHorizontal: 7,
+    paddingTop: 6,
+  },
+  mobileNavItem: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    borderRadius: 13,
+  },
+  mobileNavItemActive: { backgroundColor: colors.yellowLight },
+  mobileNavGlyph: { color: colors.grayMuted, fontSize: 18, fontWeight: '700', lineHeight: 21 },
+  mobileNavText: { color: colors.grayMuted, fontSize: 10, fontWeight: '700' },
+  mobileNavTextActive: { color: colors.brown, fontWeight: '800' },
   drawerLayer: { ...StyleSheet.absoluteFill, zIndex: 3, backgroundColor: colors.brownSurface },
   startupSplash: {
     ...StyleSheet.absoluteFill,

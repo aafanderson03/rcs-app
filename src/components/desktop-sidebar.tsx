@@ -1,5 +1,6 @@
+import { Image } from 'expo-image';
 import { usePathname, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
@@ -13,9 +14,7 @@ type Route =
   | '/announcements'
   | '/attendance'
   | '/applications'
-  | '/ticket'
   | '/help'
-/*  | '/other-urls' */
   | '/portal'
   | {
       pathname: '/records/[section]';
@@ -28,9 +27,10 @@ type Route =
       };
     };
 
-type MenuLink = {
+export type MenuLink = {
   label: string;
   route?: Route;
+  icon?: string;
 };
 
 type MenuGroup = {
@@ -42,16 +42,29 @@ type DesktopSidebarProps = {
   onNavigate?: () => void;
   fullScreen?: boolean;
   onClose?: () => void;
+  desktopRail?: boolean;
+  collapsed?: boolean;
+  companyName?: string;
+  logo?: ReturnType<typeof getCompanyBranding>['logo'];
+  onToggleCollapsed?: () => void;
 };
+
+const workspaceLinks: MenuLink[] = [
+  { label: 'Home', route: '/home' },
+  { label: 'Announcements', route: '/announcements' },
+  { label: 'Attendance & DTR', route: '/attendance' },
+  { label: 'Applications', route: '/applications' },
+];
+
+const supportLinks: MenuLink[] = [
+  { label: 'Help', route: '/help', icon: '?' },
+  { label: 'Other URLs', route: '/portal', icon: '↗' },
+];
 
 const menuGroups: MenuGroup[] = [
   {
-    label: 'Employee Inquiry',
+    label: 'Pay & benefits',
     links: [
-      {
-        label: 'Basic Profile',
-        route: { pathname: '/inquiry/[section]', params: { section: 'basic-profile' } },
-      },
       {
         label: 'Leave Balances',
         route: { pathname: '/inquiry/[section]', params: { section: 'leave-balances' } },
@@ -67,11 +80,18 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'Employee Masterfile',
-    links: [{ label: 'Personal Information' }, { label: 'Employment Information' }],
+    label: 'Profile & employment',
+    links: [
+      {
+        label: 'Basic Profile',
+        route: { pathname: '/inquiry/[section]', params: { section: 'basic-profile' } },
+      },
+      { label: 'Personal Information' },
+      { label: 'Employment Information' },
+    ],
   },
   {
-    label: 'Employee Other Information',
+    label: 'Additional records',
     links: [
       { label: 'Annual Physical Exams' },
       { label: 'Awards & Commendations' },
@@ -99,33 +119,49 @@ const menuGroups: MenuGroup[] = [
   },
 ];
 
-const initialExpandedGroups: string[] = [];
+const primaryIcons: Record<string, string> = {
+  Home: '⌂',
+  Announcements: '◉',
+  'Attendance & DTR': '◷',
+  Applications: '▤',
+  'Pay & benefits': '₱',
+  'Profile & employment': '◎',
+  'Additional records': '⋯',
+  Help: '?',
+  'Sign out': '⇥',
+};
 
 export function DesktopSidebar({
   onNavigate,
   fullScreen = false,
   onClose,
+  desktopRail = false,
+  collapsed = false,
+  companyName = '',
+  logo,
+  onToggleCollapsed,
 }: DesktopSidebarProps) {
   const { colorScheme } = useAppTheme();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(initialExpandedGroups);
   const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
-  const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
+
+  const activeGroupLabel =
+    pathname === '/inquiry/basic-profile'
+      ? 'Profile & employment'
+      : pathname.startsWith('/inquiry/')
+        ? 'Pay & benefits'
+        : menuGroups.find((group) =>
+            group.links.some((link) => pathname === `/records/${toSectionKey(link.label)}`)
+          )?.label;
 
   const navigate = (route: Route) => {
     router.replace(route);
     onNavigate?.();
   };
 
-  const toggleGroup = (label: string) => {
-    setExpandedGroups((current) =>
-      current.includes(label) ? current.filter((item) => item !== label) : [...current, label]
-    );
-  };
-
-  const renderLink = (item: MenuLink, compact = false) => {
+  const renderLink = (item: MenuLink, compact = false, iconOnly = false) => {
     const route = item.route;
     const active =
       typeof route === 'string'
@@ -139,17 +175,29 @@ export function DesktopSidebar({
       <Pressable
         key={item.label}
         accessibilityRole={route ? 'link' : undefined}
+        accessibilityLabel={iconOnly ? item.label : undefined}
         accessibilityState={route ? { selected: active } : { disabled: true }}
         disabled={!route}
         onPress={route ? () => navigate(route) : undefined}
         style={({ hovered, pressed }) => [
-          compact ? styles.primaryLink : styles.childLink,
-          active && styles.activeLink,
+          iconOnly
+            ? styles.railIconLink
+            : compact
+              ? styles.primaryLink
+              : styles.childLink,
           hovered && route && styles.hoveredLink,
+          active && styles.activeLink,
           pressed && styles.pressedLink,
         ]}
       >
-        <Text
+        {compact ? (
+          <View style={[styles.primaryIcon, active && styles.activePrimaryIcon]}>
+            <Text style={[styles.primaryIconText, active && styles.activeLinkText]}>
+              {item.icon ?? primaryIcons[item.label] ?? '•'}
+            </Text>
+          </View>
+        ) : null}
+        {!iconOnly ? <Text
           style={[
             compact ? styles.primaryLinkText : styles.childLinkText,
             active && styles.activeLinkText,
@@ -157,20 +205,145 @@ export function DesktopSidebar({
           ]}
         >
           {item.label}
-        </Text>
+        </Text> : null}
         {!item.route ? <Text style={styles.comingSoon}>Soon</Text> : null}
       </Pressable>
     );
   };
 
+  if (desktopRail) {
+    return (
+      <View style={[styles.sidebar, styles.desktopRail, collapsed && styles.collapsedDesktopRail]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onPress={onToggleCollapsed}
+          style={({ hovered, pressed }) => [
+            styles.railBrand,
+            collapsed && styles.collapsedRailBrand,
+            hovered && styles.hoveredLink,
+            pressed && styles.pressedLink,
+          ]}
+        >
+          {logo ? (
+            <Image
+              source={logo}
+              contentFit="contain"
+              style={[styles.railLogo, collapsed && styles.collapsedRailLogo]}
+              accessibilityLabel={`${companyName} logo`}
+            />
+          ) : null}
+          {collapsed ? <Text style={styles.railCollapseIcon}>›</Text> : null}
+          {!collapsed ? (
+            <>
+              <Text style={styles.railBrandName} numberOfLines={1}>{companyName}</Text>
+              <Text style={styles.railCollapseIcon}>‹</Text>
+            </>
+          ) : null}
+        </Pressable>
+
+        <ScrollView
+          style={styles.menuScroll}
+          contentContainerStyle={[styles.menuContent, collapsed && styles.collapsedMenuContent]}
+          showsVerticalScrollIndicator={false}
+        >
+          {!collapsed ? <Text style={styles.sectionLabel}>WORKSPACE</Text> : null}
+          {workspaceLinks.map((link) => renderLink(link, true, collapsed))}
+
+          {!collapsed ? (
+            <Text style={[styles.sectionLabel, styles.recordsLabel]}>EMPLOYEE RECORDS</Text>
+          ) : null}
+          {menuGroups.map((group) => {
+            return (
+              <View key={group.label} style={styles.group}>
+                {collapsed ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={group.label}
+                    onPress={onToggleCollapsed}
+                    style={({ hovered, pressed }) => [
+                      styles.railIconLink,
+                      activeGroupLabel === group.label && styles.activeGroupToggle,
+                      hovered && styles.hoveredLink,
+                      pressed && styles.pressedLink,
+                    ]}
+                  >
+                    <Text style={styles.primaryIconText}>{primaryIcons[group.label]}</Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <View style={styles.groupHeading}>
+                      <Text
+                        style={[
+                          styles.groupLabel,
+                          activeGroupLabel === group.label && styles.activeGroupLabel,
+                        ]}
+                      >
+                        {group.label}
+                      </Text>
+                    </View>
+                      <View style={styles.groupItems}>
+                        {group.links.map((link) => renderLink(withRecordRoute(link)))}
+                      </View>
+                  </>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        <View style={[styles.railFooter, collapsed && styles.collapsedRailFooter]}>
+          {!collapsed ? <Text style={styles.supportLabel}>SUPPORT</Text> : null}
+          {supportLinks.map((link) => {
+            const route = link.route;
+            if (!route) return null;
+            return (
+              <Pressable
+                key={link.label}
+                accessibilityRole="link"
+                accessibilityLabel={link.label}
+                onPress={() => navigate(route)}
+                style={({ hovered, pressed }) => [
+                  collapsed ? styles.railIconLink : styles.railSupportLink,
+                  hovered && styles.hoveredLink,
+                  pressed && styles.pressedLink,
+                ]}
+              >
+                <Text style={collapsed ? styles.primaryIconText : styles.railSupportIcon}>
+                  {link.icon}
+                </Text>
+                {!collapsed ? <Text style={styles.railSupportText}>{link.label}</Text> : null}
+              </Pressable>
+            );
+          })}
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+            onPress={async () => {
+              await signOut();
+              router.replace('/');
+              onNavigate?.();
+            }}
+            style={({ hovered, pressed }) => [
+              collapsed ? styles.railIconLink : styles.railSignOut,
+              hovered && styles.hoveredLink,
+              pressed && styles.pressedLink,
+            ]}
+          >
+            <Text style={collapsed ? styles.primaryIconText : styles.railSignOutText}>
+              {collapsed ? primaryIcons['Sign out'] : 'Sign out'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.sidebar, fullScreen && styles.fullScreenSidebar]}>
-      <View style={styles.sidebarHeader}>
-        <View>
-          <Text style={styles.sidebarEyebrow} numberOfLines={1}>{companyBranding.name.toUpperCase()}</Text>
-          <Text style={styles.sidebarTitle}>Navigation</Text>
-        </View>
-        {fullScreen && onClose ? (
+      {fullScreen && onClose ? (
+        <View style={styles.sidebarHeader}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close navigation menu"
@@ -179,65 +352,63 @@ export function DesktopSidebar({
           >
             <Text style={styles.closeButtonText}>×</Text>
           </Pressable>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuContent}>
         <Text style={styles.sectionLabel}>WORKSPACE</Text>
-        {renderLink({ label: 'Home', route: '/home' }, true)}
-        {renderLink({ label: 'Announcement', route: '/announcements' }, true)}
-        {renderLink({ label: 'Attendance & DTR', route: '/attendance' }, true)}
-        {renderLink({ label: 'Applications', route: '/applications' }, true)}
+        {workspaceLinks.map((link) => renderLink(link, true))}
 
         <Text style={[styles.sectionLabel, styles.recordsLabel]}>EMPLOYEE RECORDS</Text>
         {menuGroups.map((group) => {
-          const expanded = expandedGroups.includes(group.label);
           return (
             <View key={group.label} style={styles.group}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded }}
-                onPress={() => toggleGroup(group.label)}
-                style={({ hovered, pressed }) => [
-                  styles.groupToggle,
-                  hovered && styles.hoveredLink,
-                  pressed && styles.pressedLink,
+              <Text
+                style={[
+                  styles.groupLabel,
+                  styles.groupHeading,
+                  activeGroupLabel === group.label && styles.activeGroupLabel,
                 ]}
               >
-                <Text style={styles.groupLabel}>{group.label}</Text>
-                <Text style={styles.groupChevron}>{expanded ? '⌄' : '›'}</Text>
-              </Pressable>
-              {expanded ? (
-                <View style={styles.groupItems}>
-              {group.links.map((link) =>
-                renderLink({
-                  ...link,
-                  route:
-                    link.route ??
-                    ({ pathname: '/records/[section]', params: { section: toSectionKey(link.label) } } as const),
-                })
-              )}
-                </View>
-              ) : null}
+                {group.label}
+              </Text>
+              <View style={styles.groupItems}>
+                {group.links.map((link) =>
+                  renderLink({
+                    ...link,
+                    route:
+                      link.route ??
+                      ({
+                        pathname: '/records/[section]',
+                        params: { section: toSectionKey(link.label) },
+                      } as const),
+                  })
+                )}
+              </View>
             </View>
           );
         })}
 
-        <Text style={[styles.sectionLabel, styles.recordsLabel]}>OTHER</Text>
-        {renderLink({ label: 'Submit a ticket', route: '/ticket' }, true)}
-        {/*renderLink({ label: 'Other URLs', route: '/other-urls' }, true)*/}
-        {renderLink({ label: 'Help', route: '/help' }, true)}
-        {renderLink({ label: 'Legacy Employee Portal', route: '/portal' }, true)}
+        <Text style={[styles.sectionLabel, styles.recordsLabel]}>SUPPORT</Text>
+        {supportLinks.map((link) => renderLink(link, true))}
       </ScrollView>
 
-      <View style={styles.versionFooter}>
-        <View style={styles.accountSummary}>
-          <Text style={styles.accountName} numberOfLines={1}>{user?.displayName}</Text>
-          <Text style={styles.version} numberOfLines={1}>{companyBranding.name}</Text>
-        </View>
-        <Pressable accessibilityRole="button" onPress={async () => { await signOut(); router.replace('/'); }} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressedLink]}>
+      <View style={styles.sidebarFooter}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={async () => {
+            await signOut();
+            router.replace('/');
+            onNavigate?.();
+          }}
+          style={({ hovered, pressed }) => [
+            styles.signOutButton,
+            hovered && styles.hoveredLink,
+            pressed && styles.pressedLink,
+          ]}
+        >
           <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable> 
+        </Pressable>
       </View>
     </View>
   );
@@ -247,129 +418,201 @@ function toSectionKey(label: string) {
   return label.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+function withRecordRoute(link: MenuLink): MenuLink & { route: Route } {
+  if (link.route) return { ...link, route: link.route };
+  return {
+    ...link,
+    route: { pathname: '/records/[section]', params: { section: toSectionKey(link.label) } },
+  };
+}
+
 function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
   return StyleSheet.create({
   sidebar: {
-    width: 288,
+    width: 272,
     height: '100%',
     backgroundColor: colors.surface,
     borderRightWidth: 1,
     borderRightColor: colors.border,
   },
+  desktopRail: { width: 260, flexShrink: 0 },
+  collapsedDesktopRail: { width: 72 },
   fullScreenSidebar: { width: '100%', maxWidth: '100%', borderRightWidth: 0 },
-  sidebarHeader: {
-    height: 84,
+  railBrand: {
+    minHeight: 86,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    backgroundColor: colors.background,
+    gap: 10,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  sidebarEyebrow: {
-    color: colors.brownLight,
+  collapsedRailBrand: { justifyContent: 'center', gap: 2, paddingHorizontal: 10 },
+  railLogo: { width: 72, height: 54, flexShrink: 0 },
+  collapsedRailLogo: { width: 48, height: 36 },
+  railBrandName: { flex: 1, minWidth: 0, color: colors.brown, fontSize: 12, fontWeight: '800' },
+  railCollapseIcon: {
+    width: 28,
+    height: 28,
+    color: colors.grayMuted,
+    fontSize: 20,
+    lineHeight: 26,
+    textAlign: 'center',
+    borderRadius: 9,
+    backgroundColor: colors.grayLight,
+  },
+  collapsedMenuContent: { alignItems: 'center' },
+  railIconLink: {
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 4,
+    borderRadius: 12,
+  },
+  activeGroupToggle: { backgroundColor: colors.yellowLight },
+  railFooter: {
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  collapsedRailFooter: { alignItems: 'center', paddingHorizontal: 12 },
+  supportLabel: {
+    marginTop: 8,
+    marginBottom: 2,
+    paddingHorizontal: 12,
+    color: colors.grayMuted,
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
   },
-  sidebarTitle: { marginTop: 5, color: colors.text, fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
+  railSupportLink: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+  },
+  railSupportIcon: { width: 24, color: colors.brown, fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  railSupportText: { flex: 1, minWidth: 0, color: colors.grayDark, fontSize: 12, fontWeight: '700' },
+  railSignOut: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginTop: 5,
+    paddingHorizontal: 8,
+    borderRadius: 9,
+    backgroundColor: colors.grayLight,
+  },
+  railSignOutText: { color: colors.brown, fontSize: 12, fontWeight: '800' },
+  sidebarHeader: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 18, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   closeButton: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
   closeButtonText: { color: colors.brown, fontSize: 28, lineHeight: 30 },
   menuScroll: { flex: 1 },
-  menuContent: { paddingHorizontal: 14, paddingTop: 22, paddingBottom: 20 },
+  menuContent: { paddingHorizontal: 12, paddingTop: 18, paddingBottom: 20 },
   sectionLabel: {
-    marginHorizontal: 12,
+    marginHorizontal: 10,
     marginBottom: 8,
     color: colors.grayMuted,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.1,
   },
-  recordsLabel: { marginTop: 25 },
+  recordsLabel: { marginTop: 20 },
   primaryLink: {
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    marginBottom: 4,
-    borderRadius: 4,
+    gap: 11,
+    paddingHorizontal: 10,
+    marginBottom: 2,
+    borderRadius: 10,
   },
-  primaryLinkText: { color: colors.grayDark, fontSize: 13, fontWeight: '600' },
+  primaryLinkText: { flex: 1, color: colors.grayDark, fontSize: 12, fontWeight: '600' },
+  primaryIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  primaryIconText: { color: colors.grayMuted, fontSize: 16, fontWeight: '700' },
+  activePrimaryIcon: { backgroundColor: 'rgba(255,255,255,0.18)' },
   group: { marginBottom: 4 },
-  groupToggle: {
-    minHeight: 46,
+  groupHeading: {
+    minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    borderRadius: 9,
   },
   groupLabel: {
     flex: 1,
     color: colors.grayDark,
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 17,
     fontWeight: '700',
   },
-  groupChevron: { marginLeft: 8, color: colors.brownLight, fontSize: 22, lineHeight: 25 },
+  activeGroupLabel: { color: colors.brown },
   groupItems: {
-    paddingVertical: 5,
+    paddingVertical: 4,
     marginTop: 3,
-    marginLeft: 13,
+    marginLeft: 10,
     borderLeftWidth: 1,
     borderLeftColor: colors.border,
   },
   childLink: {
-    minHeight: 44,
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 15,
-    paddingRight: 12,
+    paddingLeft: 14,
+    paddingRight: 10,
+    marginLeft: 6,
+    borderRadius: 8,
   },
   childLinkText: { flex: 1, color: colors.grayMuted, fontSize: 12, lineHeight: 17 },
-  activeLink: { backgroundColor: colors.yellowLight },
-  activeLinkText: { color: colors.brownDark, fontWeight: '700' },
-  hoveredLink: { backgroundColor: colors.grayLight },
+  activeLink: { backgroundColor: colors.brown },
+  activeLinkText: { color: colors.white, fontWeight: '800' },
+  hoveredLink: { backgroundColor: colors.grayLight, borderRadius: 10 },
   pressedLink: { opacity: 0.75 },
-  disabledLinkText: { color: '#A8A39A' },
+  disabledLinkText: { color: colors.grayMuted },
   comingSoon: {
     marginLeft: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 3,
+    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: colors.grayLight,
     color: colors.grayMuted,
     fontSize: 9,
     fontWeight: '700',
   },
-  versionFooter: {
-    minHeight: 82,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    paddingHorizontal: 16,
-    backgroundColor: colors.background,
+  sidebarFooter: {
+    minHeight: 72,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  accountSummary: { flex: 1, minWidth: 0, gap: 3 },
-  accountName: { color: colors.brownDark, fontSize: 11, fontWeight: '800' },
-  signOutButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 4, backgroundColor: colors.yellowLight },
+  signOutButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: colors.grayLight },
   signOutText: { color: colors.brown, fontSize: 11, fontWeight: '800' },
-  version: { color: colors.grayMuted, fontSize: 10, lineHeight: 15, fontWeight: '600' },
   });
 }

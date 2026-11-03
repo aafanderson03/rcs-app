@@ -10,12 +10,40 @@
 
 html,
 body {
-  background: #f4f0e7;
+  background: #f4efe7;
   color: #292725;
   font-family: var(--font-display);
 }
 
 ::selection {
   color: #fff9ef;
-  background: #c52a31;
+  background: #b3262d;
+}
+
+:focus-visible {
+  outline: 3px solid #b3262d;
+  outline-offset: 3px;
+}
+
+#company-logo-track {
+  animation: company-logo-marquee 24s linear infinite;
+  will-change: transform;
+}
+
+@keyframes company-logo-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #company-logo-track {
+    animation: none;
+    will-change: auto;
+  }
+
+  #company-logo-viewport {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
 }

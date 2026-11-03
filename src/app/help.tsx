@@ -249,6 +249,14 @@ const resources = [
   },
 ];
 
+function resourcePreview(content: string, query: string) {
+  const normalizedContent = content.replace(/\s+/g, ' ').trim();
+  const matchIndex = query ? normalizedContent.toLowerCase().indexOf(query) : 0;
+  const start = matchIndex > 60 ? matchIndex - 45 : 0;
+  const end = Math.min(start + 150, normalizedContent.length);
+  return `${start > 0 ? '…' : ''}${normalizedContent.slice(start, end)}${end < normalizedContent.length ? '…' : ''}`;
+}
+
 export default function HelpScreen() {
   const { colorScheme } = useAppTheme();
   const palette = getPaletteForScheme(colorScheme);
@@ -319,6 +327,7 @@ export default function HelpScreen() {
             <View style={styles.resourceCopy}>
               <Text style={styles.resourceType}>{resource.type}</Text>
               <Text style={styles.resourceTitle}>{resource.title}</Text>
+              <Text style={styles.resourcePreview}>{resourcePreview(resource.content, normalizedQuery)}</Text>
             </View>
             <Text style={styles.resourceArrow}>↗</Text>
           </Pressable>
@@ -486,7 +495,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       minHeight: 48,
       paddingHorizontal: 15,
       marginBottom: 16,
-      borderRadius: 4,
+      borderRadius: 12,
       backgroundColor: RcsColors.surface,
       borderWidth: 1,
       borderColor: RcsColors.border,
@@ -502,7 +511,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       alignItems: 'center',
       paddingHorizontal: 18,
       paddingVertical: 14,
-      borderRadius: 4,
+      borderRadius: 12,
       backgroundColor: RcsColors.surface,
       borderWidth: 1,
       borderColor: RcsColors.border,
@@ -511,6 +520,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     resourceCopy: { flex: 1, minWidth: 0 },
     resourceType: { color: RcsColors.grayMuted, fontSize: 10, fontWeight: '700' },
     resourceTitle: { marginTop: 4, color: RcsColors.text, fontSize: 15, fontWeight: '700' },
+    resourcePreview: { marginTop: 6, color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
     resourceArrow: { marginLeft: 12, color: RcsColors.brown, fontSize: 18 },
     pressed: { opacity: 0.75 },
     modalBackdrop: {
@@ -528,7 +538,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       backgroundColor: RcsColors.background,
       borderWidth: 1,
       borderColor: RcsColors.border,
-      borderRadius: 6,
+      borderRadius: 14,
       elevation: 16,
     },
     modalHeader: {
@@ -550,7 +560,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 4,
+      borderRadius: 10,
       backgroundColor: RcsColors.grayLight,
     },
     closeButtonText: { color: RcsColors.text, fontSize: 27, lineHeight: 30 },

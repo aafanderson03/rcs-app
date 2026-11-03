@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { ChoicePicker, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
-import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
+import { ChoicePicker, DateRangeFilter, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
+import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 import { useAppTheme } from '@/contexts/theme-context';
@@ -34,15 +34,16 @@ export default function DashboardScreen() {
   const [to, setTo] = useState('');
 
 
-  const dateRows = applications.filter(
+  const invalidRange = Boolean(from && to && from > to);
+  const filteredDateRows = invalidRange ? [] : applications.filter(
     (item) => (!from || item.submittedAt >= from) && (!to || item.submittedAt <= to)
   );
 
-  const rows = dateRows.filter((item) => status === 'All statuses' || item.status === status);
+  const rows = filteredDateRows.filter((item) => status === 'All statuses' || item.status === status);
 
   const statusTotals = trackedStatuses.map((name) => ({
     name,
-    count: dateRows.filter((item) => item.status === name).length,
+    count: filteredDateRows.filter((item) => item.status === name).length,
   }));
 
   const categoryCounts = transactionCategories
@@ -68,8 +69,16 @@ export default function DashboardScreen() {
       <PreviewNotice>Fictional request activity for presentation only. These examples do not represent live employee records.</PreviewNotice>
 
       <View style={styles.filters}>
-        <DateField label="From" value={from} onChangeText={setFrom} />
-        <DateField label="To" value={to} onChangeText={setTo} />
+        <DateRangeFilter
+          from={from}
+          to={to}
+          onChangeFrom={setFrom}
+          onChangeTo={setTo}
+          onClear={() => {
+            setFrom('');
+            setTo('');
+          }}
+        />
         <View style={styles.statusFilter}>
           <ChoicePicker
             label="Application status"
@@ -111,7 +120,12 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        {rows.length === 0 ? (
+        {invalidRange ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Invalid date range</Text>
+            <Text style={styles.emptyText}>Choose a From date on or before the To date.</Text>
+          </View>
+        ) : rows.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No requests match these filters</Text>
             <Text style={styles.emptyText}>Widen the date range or choose All statuses.</Text>
@@ -164,31 +178,6 @@ function categoryMatches(category: string, type: string) {
   return normalized === value || normalized === `${value} transactions`;
 }
 
-function DateField({
-  label,
-  value,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-}) {
-  const { styles, palette } = useDashboardStyles();
-  return (
-    <View style={styles.dateField}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <TextInput
-        accessibilityLabel={`${label} date`}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={palette.grayMuted}
-        style={styles.dateInput}
-      />
-    </View>
-  );
-}
-
 function useDashboardStyles() {
   const { colorScheme } = useAppTheme();
   const palette = getPaletteForScheme(colorScheme);
@@ -218,18 +207,6 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       zIndex: 10,
       elevation: 10,
     },
-    dateField: { flexGrow: 1, flexBasis: 190 },
-    filterLabel: { marginBottom: 7, color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
-    dateInput: {
-      height: 46,
-      paddingHorizontal: 13,
-      borderRadius: 4,
-      backgroundColor: RcsColors.surface,
-      borderWidth: 1,
-      borderColor: RcsColors.border,
-      color: RcsColors.text,
-      fontSize: 13,
-    },
     statusFilter: { flexGrow: 1, flexBasis: 230 },
 
     tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 18 },
@@ -240,7 +217,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
       minWidth: 0,
       paddingVertical: 16,
       paddingHorizontal: 18,
-      borderRadius: 4,
+      borderRadius: 12,
       backgroundColor: RcsColors.surface,
       borderWidth: 1,
       borderColor: RcsColors.border,
@@ -253,7 +230,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     chartCard: {
       minWidth: 0,
       padding: 22,
-      borderRadius: 4,
+      borderRadius: 12,
       backgroundColor: RcsColors.surface,
       borderWidth: 1,
       borderColor: RcsColors.border,

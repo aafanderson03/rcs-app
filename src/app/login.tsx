@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
@@ -9,13 +9,12 @@ import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
 import { isStandaloneDemoMode, useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
-import { DEMO_PASSWORD, demoAccounts } from '@/data/demo-accounts';
+import { DEMO_PASSWORD, demoCompanies } from '@/data/demo-accounts';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
   const { colorScheme } = useAppTheme();
-  const loginBrand = getCompanyBranding();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 800;
   const isMobile = width < 600;
@@ -27,6 +26,18 @@ export default function LoginScreen() {
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const desktopWeb = Platform.OS === 'web' && isDesktop;
+  const selectedDemoAccount = demoCompanies
+    .flatMap((company) => company.accounts)
+    .find((account) => account.username === username);
+
+  const chooseDemoAccount = (selectedUsername: string) => {
+    setUsername(selectedUsername);
+    setPassword(isStandaloneDemoMode ? DEMO_PASSWORD : '');
+    setMessage('');
+    setAccountMenuOpen(false);
+  };
 
   const submit = async () => {
     if (!username.trim() || !password) {
@@ -49,13 +60,79 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={[styles.page, isCompact && styles.compactPage, isDesktop && styles.desktopPage]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.loginShell, isDesktop && styles.desktopLoginShell]}>
-          <View style={[styles.brandPanel, isCompact && styles.compactBrandPanel]}>
+          <View style={[styles.brandPanel, isCompact && styles.compactBrandPanel, isDesktop && styles.desktopBrandPanel]}>
             <View style={styles.brandTopLine} />
-            <Image source={loginBrand.logo} contentFit="contain" style={[styles.logo, isCompact && styles.compactLogo]} accessibilityLabel={loginBrand.name} />
-            <View style={styles.brandDivider} />
-            <Text style={styles.brandLabel}>EMPLOYEE PORTAL</Text>
+            <View style={styles.brandIdentity}>
+              <Text style={[styles.brandLabel, isDesktop && styles.desktopBrandLabel]}>EMPLOYEE PORTAL</Text>
+            </View>
+            {desktopWeb ? (
+              <View nativeID="company-logo-viewport" accessibilityLabel="Company logos" style={styles.desktopLogoViewport}>
+                <View nativeID="company-logo-track" style={styles.desktopLogoTrack}>
+                  <View style={styles.desktopLogoSequence}>
+                    {demoCompanies.map((company) => {
+                      const companyLogo = getCompanyBranding(company.slug, company.name);
+                      return (
+                        <View key={company.slug} style={[styles.companyLogoFrame, styles.desktopCompanyLogoFrame]}>
+                          <Image
+                            source={companyLogo.logo}
+                            contentFit="contain"
+                            style={styles.companyLogo}
+                            accessibilityLabel={`${company.name} logo`}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <View style={styles.desktopLogoSequence} accessible={false} importantForAccessibility="no-hide-descendants">
+                    {demoCompanies.map((company) => {
+                      const companyLogo = getCompanyBranding(company.slug, company.name);
+                      return (
+                        <View key={company.slug} style={[styles.companyLogoFrame, styles.desktopCompanyLogoFrame]}>
+                          <Image
+                            source={companyLogo.logo}
+                            contentFit="contain"
+                            style={styles.companyLogo}
+                            accessibilityLabel={`${company.name} logo`}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <ScrollView
+                accessibilityLabel="Company logos"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.companyLogoStrip}
+                contentContainerStyle={styles.companyLogoStripContent}
+              >
+                {demoCompanies.map((company) => {
+                  const companyLogo = getCompanyBranding(company.slug, company.name);
+                  return (
+                    <View key={company.slug} style={styles.companyLogoFrame}>
+                      <Image
+                        source={companyLogo.logo}
+                        contentFit="contain"
+                        style={styles.companyLogo}
+                        accessibilityLabel={`${company.name} logo`}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+            {isDesktop ? (
+              <View style={styles.brandMessage}>
+                <Text style={styles.brandHeroTitle}>Your work, in one place.</Text>
+                <Text style={styles.brandHeroDescription}>
+                  Check your time, manage requests, and stay up to date with your team.
+                </Text>
+              </View>
+            ) : null}
           </View>
-          <View style={[styles.card, isCompact && styles.compactCard]}>
+          <View style={[styles.card, isCompact && styles.compactCard, isDesktop && styles.desktopCard]}>
           <Text style={styles.title}>Sign in</Text>
           <Text style={styles.description}>{isStandaloneDemoMode ? 'Sign in with a sample demo account.' : 'Sign in with your employee account.'}</Text>
 
@@ -63,15 +140,72 @@ export default function LoginScreen() {
             <Text style={styles.noticeText}>{isStandaloneDemoMode ? 'Standalone demo · Sample data is stored on this device' : 'Local prototype · Not connected to production systems'}</Text>
           </View>
           {__DEV__ || isStandaloneDemoMode ? (
-            <View style={styles.demoCredentials}>
-              <Text style={styles.demoCredentialsTitle}>Demo accounts</Text>
-              {demoAccounts.map((demoUser) => (
-                <Text key={demoUser.username} style={styles.demoCredentialRow}>
-                  {demoUser.displayName} · {demoUser.companyLabel} — {demoUser.username}
-                </Text>
-              ))}
+            <View style={[styles.demoCredentials, accountMenuOpen && styles.demoCredentialsOpen]}>
+              <Text style={styles.demoCredentialsTitle}>Demo account</Text>
+              <View style={[styles.accountDropdownAnchor, accountMenuOpen && styles.accountDropdownAnchorOpen]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={selectedDemoAccount ? `Selected ${selectedDemoAccount.label}. Choose another account` : 'Choose a company and account type'}
+                  accessibilityState={{ expanded: accountMenuOpen }}
+                  onPress={() => setAccountMenuOpen((open) => !open)}
+                  style={({ pressed }) => [styles.accountDropdown, accountMenuOpen && styles.accountDropdownOpen, pressed && styles.pressed]}
+                >
+                  <View style={styles.accountDropdownText}>
+                    <Text style={styles.accountDropdownLabel} numberOfLines={1}>
+                      {selectedDemoAccount?.label ?? 'Choose a company and account type'}
+                    </Text>
+                    <Text style={styles.accountDropdownHint} numberOfLines={1}>
+                      {selectedDemoAccount
+                        ? `${selectedDemoAccount.displayName} · ${selectedDemoAccount.companyName}`
+                        : 'Select a demo account'}
+                    </Text>
+                  </View>
+                  <Text style={styles.accountDropdownChevron}>{accountMenuOpen ? '⌃' : '⌄'}</Text>
+                </Pressable>
+                {accountMenuOpen ? (
+                  <ScrollView
+                    accessibilityLabel="Company and account type options"
+                    style={styles.accountDropdownMenu}
+                    contentContainerStyle={styles.accountDropdownMenuContent}
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                  >
+                    {demoCompanies.map((company) => {
+                      const companyLogo = getCompanyBranding(company.slug, company.name);
+                      return (
+                        <View key={company.slug} style={styles.demoCompany}>
+                          <View style={styles.demoCompanyHeader}>
+                            <View style={styles.demoLogoFrame}>
+                              <Image source={companyLogo.logo} contentFit="contain" style={styles.demoLogo} accessibilityLabel={`${company.name} logo`} />
+                            </View>
+                            <Text style={styles.demoCompanyName}>{company.name}</Text>
+                          </View>
+                          {company.accounts.map((account) => (
+                            <Pressable
+                              key={account.username}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Select ${account.label} account`}
+                              accessibilityState={{ selected: username === account.username }}
+                              onPress={() => chooseDemoAccount(account.username)}
+                              style={({ pressed }) => [
+                                styles.demoRoleLink,
+                                username === account.username && styles.demoAccountSelected,
+                                pressed && styles.pressed,
+                              ]}
+                            >
+                              <Text style={styles.demoRoleLabel}>{account.label}</Text>
+                              <Text style={styles.demoAccountUsername}>{account.displayName} · {account.username}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+              </View>
               <Text style={styles.demoCredentialsHint}>
-                Shared demo password: {DEMO_PASSWORD}.{isStandaloneDemoMode ? ' Sign-in works offline.' : ' For local setup, AUTH_TEST_PASSWORD can be changed in .env.local.'}
+                Demo password: {DEMO_PASSWORD}.{isStandaloneDemoMode ? ' Sign-in works offline.' : ''}
               </Text>
             </View>
           ) : null}
@@ -110,34 +244,65 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     page: { flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: colors.background },
     compactPage: { padding: 14 },
     desktopPage: { padding: 36 },
-    loginShell: { width: '100%', maxWidth: 470, alignSelf: 'center', overflow: 'hidden', borderRadius: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-    desktopLoginShell: { maxWidth: 470 },
-    brandPanel: { minHeight: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingTop: 9, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-    compactBrandPanel: { minHeight: 78, paddingHorizontal: 14 },
-    brandTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: colors.brown },
-    logo: { width: 112, height: 64, marginRight: 16, borderRadius: 4 },
-    compactLogo: { width: 112, height: 64, marginRight: 10 },
-    brandDivider: { width: 1, height: 34, marginRight: 16, backgroundColor: colors.border },
+    loginShell: { width: '100%', maxWidth: 520, alignSelf: 'center', overflow: 'visible', borderRadius: 24, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    desktopLoginShell: { maxWidth: 1060, flexDirection: 'row', minHeight: 610 },
+    brandPanel: { minHeight: 92, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 22, paddingVertical: 14, backgroundColor: colors.yellowLight, borderBottomWidth: 1, borderBottomColor: colors.border, borderTopLeftRadius: 23, borderTopRightRadius: 23 },
+    compactBrandPanel: { minHeight: 88, paddingHorizontal: 14 },
+    desktopBrandPanel: { flex: 1, minHeight: 610, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: 52, paddingTop: 0, backgroundColor: colors.yellowLight, borderBottomWidth: 0 },
+    brandIdentity: { flexDirection: 'column', alignItems: 'center', gap: 8 },
+    companyLogoStrip: { width: '100%', flexGrow: 0, flexShrink: 1 },
+    companyLogoStripContent: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 1 },
+    desktopLogoViewport: { width: '100%', overflow: 'hidden' },
+    desktopLogoTrack: { flexDirection: 'row', alignSelf: 'flex-start', gap: 0 },
+    desktopLogoSequence: { flexDirection: 'row', flexGrow: 0, flexShrink: 0, alignItems: 'center', gap: 7 },
+    companyLogoFrame: { width: 48, height: 48, flexGrow: 0, flexShrink: 0, alignItems: 'center', justifyContent: 'center', padding: 4, borderRadius: 7, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    desktopCompanyLogoFrame: { width: 88, height: 88, padding: 8, borderRadius: 12 },
+    companyLogo: { width: '100%', height: '100%' },
+    brandTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 5, backgroundColor: colors.yellow },
     brandLabel: { color: colors.grayDark, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-    card: { width: '100%', paddingHorizontal: 28, paddingTop: 25, paddingBottom: 22, backgroundColor: colors.surface },
+    desktopBrandLabel: { marginTop: 18, color: colors.brown },
+    brandMessage: { marginTop: 42, gap: 12 },
+    brandHeroTitle: { maxWidth: 360, color: colors.brownDark, fontSize: 36, lineHeight: 42, fontWeight: '800', letterSpacing: -1.2 },
+    brandHeroDescription: { maxWidth: 340, color: colors.grayDark, fontSize: 14, lineHeight: 23 },
+    card: { width: '100%', paddingHorizontal: 28, paddingTop: 25, paddingBottom: 22, backgroundColor: colors.surface, borderBottomLeftRadius: 23, borderBottomRightRadius: 23 },
+    desktopCard: { flex: 1, justifyContent: 'center', paddingHorizontal: 54, paddingTop: 52, paddingBottom: 52 },
     compactCard: { paddingHorizontal: 19, paddingTop: 22 },
-    title: { color: colors.text, fontSize: 25, fontWeight: '700', letterSpacing: -0.5 },
+    title: { color: colors.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.8 },
     description: { marginTop: 5, marginBottom: 18, color: colors.grayMuted, fontSize: 13, lineHeight: 19 },
-    notice: { paddingVertical: 8, paddingHorizontal: 10, marginBottom: 18, borderRadius: 5, backgroundColor: colors.yellowLight, borderLeftWidth: 2, borderLeftColor: colors.yellow },
+    notice: { paddingVertical: 10, paddingHorizontal: 12, marginBottom: 18, borderRadius: 10, backgroundColor: colors.yellowLight, borderLeftWidth: 3, borderLeftColor: colors.yellow },
     noticeText: { color: colors.grayDark, fontSize: 10, lineHeight: 15 },
-    demoCredentials: { marginTop: -8, marginBottom: 16, padding: 10, borderRadius: 4, backgroundColor: colors.background },
-    demoCredentialsTitle: { marginBottom: 4, color: colors.brownDark, fontSize: 11, fontWeight: '800' },
-    demoCredentialRow: { color: colors.brownLight, fontSize: 10, lineHeight: 16, fontWeight: '600' },
-    demoCredentialsHint: { marginTop: 5, color: colors.grayMuted, fontSize: 9, lineHeight: 13 },
+    demoCredentials: { marginTop: -8, marginBottom: 16, padding: 12, borderRadius: 10, backgroundColor: colors.background, overflow: 'visible' },
+    demoCredentialsOpen: { zIndex: 30, elevation: 20 },
+    demoCredentialsTitle: { color: colors.brownDark, fontSize: 11, fontWeight: '800' },
+    demoCredentialsHint: { marginTop: 7, color: colors.grayMuted, fontSize: 10, lineHeight: 14 },
+    accountDropdown: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 7, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    accountDropdownOpen: { borderColor: colors.brown },
+    accountDropdownText: { flex: 1, minWidth: 0 },
+    accountDropdownLabel: { color: colors.text, fontSize: 12, fontWeight: '700' },
+    accountDropdownHint: { marginTop: 2, color: colors.grayMuted, fontSize: 10 },
+    accountDropdownChevron: { color: colors.brown, fontSize: 18, fontWeight: '800' },
+    accountDropdownAnchor: { position: 'relative', zIndex: 1 },
+    accountDropdownAnchorOpen: { zIndex: 20, elevation: 10 },
+    accountDropdownMenu: { position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: 250, marginTop: 6, borderRadius: 9, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, elevation: 20, zIndex: 30 },
+    accountDropdownMenuContent: { paddingHorizontal: 8, paddingVertical: 3 },
+    demoCompany: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },
+    demoCompanyHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    demoLogoFrame: { width: 42, height: 36, alignItems: 'center', justifyContent: 'center', padding: 3, borderRadius: 7, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    demoLogo: { width: '100%', height: '100%' },
+    demoCompanyName: { flex: 1, color: colors.brownDark, fontSize: 11, lineHeight: 15, fontWeight: '800' },
+    demoRoleLink: { minHeight: 38, justifyContent: 'center', marginTop: 3, marginLeft: 49, paddingHorizontal: 8, borderRadius: 7 },
+    demoRoleLabel: { color: colors.brownLight, fontSize: 11, lineHeight: 14, fontWeight: '700' },
+    demoAccountUsername: { color: colors.grayMuted, fontSize: 10, lineHeight: 13 },
+    demoAccountSelected: { backgroundColor: colors.yellowLight },
     field: { marginBottom: 15 },
     label: { marginBottom: 7, color: colors.grayDark, fontSize: 12, fontWeight: '700' },
-    input: { minHeight: 50, paddingHorizontal: 14, borderRadius: 4, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, color: colors.text, fontSize: 14 },
+    input: { minHeight: 54, paddingHorizontal: 16, borderRadius: 14, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, color: colors.text, fontSize: 14 },
     mobileInput: { fontSize: 16 },
     passwordRow: { flexDirection: 'row', alignItems: 'center' },
     passwordInput: { flex: 1, paddingRight: 64 },
     showPassword: { position: 'absolute', right: 4, minWidth: 56, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     showPasswordText: { color: colors.brown, fontSize: 11, fontWeight: '700' },
-    submitButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 3, borderRadius: 4, backgroundColor: colors.brown },
+    submitButton: { minHeight: 54, alignItems: 'center', justifyContent: 'center', marginTop: 3, borderRadius: 14, backgroundColor: colors.brown },
     submitButtonText: { color: colors.white, fontSize: 13, fontWeight: '800' },
     disabled: { opacity: 0.6 },
     message: { marginTop: 13, color: colors.danger, fontSize: 12, lineHeight: 18 },

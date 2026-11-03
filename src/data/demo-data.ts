@@ -60,6 +60,11 @@ export type DemoAttendanceRecord = {
   totalWorked: string;
 };
 
+export type DemoCurrentDayAttendance = {
+  record: DemoAttendanceRecord | null;
+  latestPunch: DemoPunch | null;
+};
+
 export type DemoMonthlyLateSummary = {
   lateDays: number;
   lateMinutes: number;
@@ -214,6 +219,12 @@ function formatPunchTime(minutes: number) {
   const minute = minutes % 60;
   const hour12 = hour24 % 12 || 12;
   return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${hour24 < 12 ? "AM" : "PM"}`;
+}
+
+function getPunchMinutes(time: string) {
+  const [clock, meridiem] = time.split(" ");
+  const [hour, minute] = clock.split(":").map(Number);
+  return ((hour % 12) + (meridiem === "PM" ? 12 : 0)) * 60 + minute;
 }
 
 function formatWorkedTime(minutes: number) {
@@ -373,10 +384,13 @@ export const demoEmployee = {
   employmentRemarks: chooseDemoValue(["Sample profile for demonstration.", "No additional demo remarks.", "Fictional employee record."]),
 };
 
-function buildDemoAttendance(date: Date): DemoAttendanceRecord | null {
+function buildDemoAttendance(
+  date: Date,
+  includeToday = false,
+): DemoAttendanceRecord | null {
   const key = dateKey(date);
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  if (start >= todayStart || isRestDay(start)) return null;
+  if ((!includeToday && start >= todayStart) || isRestDay(start)) return null;
 
   const absence = getAbsenceType(start);
   if (absence) return buildAbsenceRecord(key, absence);
@@ -455,6 +469,25 @@ export function getDemoAttendance(date: Date): DemoAttendanceRecord | null {
   return buildDemoAttendance(date);
 }
 
+export function getDemoCurrentDayAttendance(
+  now: Date = new Date(),
+): DemoCurrentDayAttendance {
+  const record = buildDemoAttendance(now, true);
+  if (!record || record.status === "SIL" || record.status === "LWOP") {
+    return { record, latestPunch: null };
+  }
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const availablePunches = record.punches.filter(
+    (punch) => getPunchMinutes(punch.time) <= currentMinutes,
+  );
+  const currentRecord = { ...record, punches: availablePunches };
+  return {
+    record: currentRecord,
+    latestPunch: availablePunches[availablePunches.length - 1] ?? null,
+  };
+}
+
 export function getDemoAttendanceForPayroll(
   date: Date,
 ): DemoAttendanceRecord | null {
@@ -464,6 +497,7 @@ export function getDemoAttendanceForPayroll(
 export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
   const year = date.getFullYear();
   const month = date.getMonth();
+  const now = new Date();
   const finalDay = Math.min(
     date.getDate(),
     new Date(year, month + 1, 0).getDate(),
@@ -475,12 +509,22 @@ export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
   let lwopDays = 0;
 
   for (let day = 1; day <= finalDay; day += 1) {
-    const record = getDemoAttendance(new Date(year, month, day));
+    const isToday =
+      year === now.getFullYear() &&
+      month === now.getMonth() &&
+      day === now.getDate();
+    const todayAttendance = isToday ? getDemoCurrentDayAttendance(now) : null;
+    const record = todayAttendance?.record ?? getDemoAttendance(new Date(year, month, day));
     if (record?.status === "SIL") silDays += 1;
     if (record?.status === "LWOP") lwopDays += 1;
-    if (record && record.totalLateMinutes > 0) {
+    const dayLateMinutes = isToday
+      ? todayAttendance?.latestPunch
+        ? record?.lateByMinutes ?? 0
+        : 0
+      : record?.totalLateMinutes ?? 0;
+    if (dayLateMinutes > 0) {
       lateDays += 1;
-      lateMinutes += record.totalLateMinutes;
+      lateMinutes += dayLateMinutes;
 
       if (lateDays >= 12 || lateMinutes >= 120) offenseNumber += 1;
     }
@@ -1024,6 +1068,11 @@ export const demoAnnouncements = [
     date: relativeDate(-1),
     title: "Payroll schedule reminder",
     body: "This sample notice demonstrates how payroll updates can be shared with employees. Check the posted payroll calendar for your pay-period dates.",
+    content: [
+      "To help you plan ahead, please check the posted payroll calendar for the pay-period coverage and expected crediting dates.",
+      "Cut-off dates and processing schedules may vary when a scheduled date falls on a weekend or holiday. Please review the official payroll notice for the applicable period before making arrangements.",
+      "For questions about your individual payroll record, contact your HR or payroll representative through the approved company channel.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-02",
@@ -1031,6 +1080,11 @@ export const demoAnnouncements = [
     date: relativeDate(-3),
     title: "Quarterly store safety review",
     body: "Store teams should review the safety checklist with their supervisor. This is fictional presentation content, not an active company notice.",
+    content: [
+      "All store teams are encouraged to review the current workplace safety checklist with their supervisor during the quarterly safety review.",
+      "Please check that aisles and exits remain clear, report damaged equipment promptly, and confirm that emergency supplies are accessible. Raise any concerns through your store's established reporting process.",
+      "This is fictional presentation content and does not replace official safety instructions.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-03",
@@ -1038,6 +1092,11 @@ export const demoAnnouncements = [
     date: relativeDate(-7),
     title: "Benefits enrollment window",
     body: "A sample benefits reminder with an example enrollment window and next steps for employees.",
+    content: [
+      "Employees are encouraged to review their current benefits selections and confirm that their personal information is up to date.",
+      "If an enrollment window applies to you, refer to the official benefits communication for the dates, eligibility rules, required forms, and submission instructions. Supporting documents should be sent only through the approved company channel.",
+      "Contact your HR representative if you need help understanding the enrollment process. This sample notice does not describe an active enrollment period.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-04",
@@ -1045,6 +1104,11 @@ export const demoAnnouncements = [
     date: relativeDate(-10),
     title: "Company-wide meeting",
     body: "Join us for the monthly company meeting to discuss updates and upcoming initiatives.",
+    content: [
+      "Employees are invited to the monthly company-wide meeting to hear organizational updates and learn about upcoming initiatives.",
+      "The meeting date, time, venue, and any joining instructions will be shared through the official company announcement. Please coordinate with your supervisor if your work schedule affects your availability.",
+      "This is a fictional example notice for presentation purposes.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-05",
@@ -1052,6 +1116,11 @@ export const demoAnnouncements = [
     date: relativeDate(-15),
     title: "Inventory audit schedule",
     body: "Store teams should prepare for the upcoming inventory audit. This is a sample notice for demonstration purposes.",
+    content: [
+      "Store teams should prepare for the upcoming inventory audit by following the schedule and preparation checklist issued by their supervisor.",
+      "Keep stock areas organized, make sure required records are available, and report discrepancies using the established store process. Your supervisor will confirm the audit date and any location-specific instructions.",
+      "This is a sample notice and is not an active audit schedule.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-06",
@@ -1059,6 +1128,11 @@ export const demoAnnouncements = [
     date: relativeDate(-20),
     title: "Annual performance review window",
     body: "Performance reviews will be conducted this quarter. Please ensure all documentation is up to date.",
+    content: [
+      "The annual performance review is an opportunity for employees and supervisors to discuss accomplishments, goals, and development needs.",
+      "Please review any applicable work records and prepare topics you would like to discuss. Your supervisor or HR representative will share the confirmed review schedule and process.",
+      "This is fictional presentation content, not an active review schedule.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-07",
@@ -1066,6 +1140,11 @@ export const demoAnnouncements = [
     date: relativeDate(-25),
     title: "Holiday schedule announcement",
     body: "The company will observe the following holidays. Please plan accordingly.",
+    content: [
+      "Employees should refer to the official holiday schedule and their assigned work schedule when planning for upcoming holidays.",
+      "Store operations and staffing arrangements may differ by location and role. Your supervisor will communicate any applicable schedule changes and reporting instructions.",
+      "This sample announcement does not set or confirm actual company holiday operations.",
+    ].join("\n\n"),
   },
   {
     id: "DEMO-NEWS-08",
@@ -1073,6 +1152,11 @@ export const demoAnnouncements = [
     date: relativeDate(-30),
     title: "Tax filing deadline reminder",
     body: "Ensure all necessary documents are submitted before the tax filing deadline. This is a sample notice for demonstration purposes.",
+    content: [
+      "Please review the official tax filing instructions and submit any required employee information by the deadline communicated by HR or payroll.",
+      "Check that the information on your submitted documents is complete and accurate. Use only approved company channels when sending personal or tax-related information.",
+      "This is a fictional reminder and does not contain an active deadline.",
+    ].join("\n\n"),
   },
 ];
 
@@ -1096,7 +1180,7 @@ function demoMilestoneDate(index: number, count: number) {
 }
 
 export const demoEmployeeNames = [
-  "Mia Santos",
+  "Aaron Anthony Anderson",
   "Rafael Cruz",
   "Bianca Reyes",
   "Paolo Garcia",
@@ -1192,7 +1276,7 @@ export const demoRecordValues: Record<
   "bank-accounts": [
     { label: "Bank", value: "Demo Bank" },
     { label: "Account name", value: demoEmployee.name },
-    { label: "Account number", value: "**** 1042 · Sample" },
+    { label: "Account number", value: "DEMO-ACCOUNT-0001 · not a real account" },
   ],
   "disciplinary-cases": [
     { label: "Active cases", value: "None · Sample record" },
@@ -1229,7 +1313,7 @@ export const demoRecordValues: Record<
   ],
   "health-insurance": [
     { label: "Provider", value: "Demo Health Plan" },
-    { label: "Member number", value: "DEMO-****-1042" },
+    { label: "Member number", value: "DEMO-HIP-0001 · not a real member number" },
     { label: "Coverage", value: "Employee · Sample" },
   ],
   "health-record": [

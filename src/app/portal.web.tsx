@@ -56,7 +56,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   warning: {
     padding: 16,
     backgroundColor: RcsColors.yellowLight,
-    borderRadius: 4,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: RcsColors.yellow,
   },
@@ -68,7 +68,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     marginTop: 18,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.brown,
   },
   buttonText: { color: RcsColors.white, fontSize: 14, fontWeight: '700' },

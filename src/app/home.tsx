@@ -1,14 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 
 import { PortalCalendar } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getCompanyBranding } from '@/constants/company-branding';
 import { getPaletteForScheme } from '@/constants/theme';
-import { useAuth, type EmployeeType } from '@/contexts/auth-context';
+import { useAuth } from '@/contexts/auth-context';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import {
@@ -17,56 +17,14 @@ import {
   demoEmployee,
   demoLeaveBalances,
   formatDemoDate,
-  formatDemoDuration,
   getDemoAbsenceDates,
   getDemoAbsenceForKey,
+  getDemoCurrentDayAttendance,
   getDemoMonthlyLateSummary,
-  getRecentDemoAttendance,
   isRestDay,
 } from '@/data/demo-data';
 import { getHolidays, type Holiday } from '@/data/holidays';
 import { getDemoMilestones } from '@/data/milestones';
-
-const workspaceContent: Record<EmployeeType, {
-  links: { label: string; detail: string; route: string }[];
-}> = {
-  employee: {
-    links: [
-      { label: 'Attendance & DTR', detail: 'Review attendance and time records', route: '/attendance' },
-      { label: 'Applications', detail: 'Submit a request', route: '/applications' },
-      { label: 'Employee inquiry', detail: 'Open your profile and balances', route: '/inquiry/basic-profile' },
-    ],
-  },
-  merchandiser: {
-    links: [
-      { label: 'Attendance & DTR', detail: 'Review your attendance record', route: '/attendance' },
-      { label: 'Announcements', detail: 'Read the latest team updates', route: '/announcements' },
-      { label: 'Help & guides', detail: 'Find instructions for common requests', route: '/help' },
-    ],
-  },
-  guard: {
-    links: [
-      { label: 'Attendance & DTR', detail: 'Review your attendance record', route: '/attendance' },
-      { label: 'Announcements', detail: 'Read the latest team updates', route: '/announcements' },
-      { label: 'Help & guides', detail: 'Find instructions for common requests', route: '/help' },
-    ],
-  },
-  subcontractor: {
-    links: [
-      { label: 'Applications', detail: 'Submit a request', route: '/applications' },
-      { label: 'Announcements', detail: 'Read the latest company updates', route: '/announcements' },
-      { label: 'Help & guides', detail: 'Find instructions for common requests', route: '/help' },
-    ],
-  },
-};
-
-const routeGlyphs: Record<string, string> = {
-  '/attendance': '◷',
-  '/applications': '✎',
-  '/inquiry/basic-profile': '☷',
-  '/announcements': '✉',
-  '/help': '?',
-};
 
 function nextPayday(from: Date) {
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -104,7 +62,7 @@ function initials(name: string) {
 }
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, profilePicture } = useAuth();
   const { applications } = useDemoSubmissions();
   const { colorScheme } = useAppTheme();
   const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
@@ -113,43 +71,33 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
   const isMobile = width < 600;
+  const isCompactMobile = width < 360;
   const isWide = isDesktop && width >= 1200;
-  const employeeType = user?.employeeType ?? 'employee';
-  const workspace = workspaceContent[employeeType];
-  const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
 
   
-  const today = new Date();
+  const [today, setToday] = useState(() => new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setToday(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const hour = today.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const formattedDate = today.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const firstName = user?.displayName.trim().split(/\s+/)[0] ?? demoEmployee.firstName;
 
-  const recentAttendance = getRecentDemoAttendance();
-  const recentAttendanceDate = recentAttendance
-    ? formatDemoDate(recentAttendance.date, { weekday: 'short', month: 'short', day: 'numeric' })
-    : '';
-  const lastAttendanceWasYesterday = recentAttendance
-    ? recentAttendance.date === dateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))
-    : false;
-  const hoursRatio = recentAttendance
-    ? Math.min(1, recentAttendance.paidMinutes / recentAttendance.scheduledPaidMinutes)
-    : 0;
+  const todayAttendance = getDemoCurrentDayAttendance(today);
+  const todayRecord = todayAttendance.record;
+  const latestPunch = todayAttendance.latestPunch;
+  const todayIsLate = Boolean(todayRecord?.lateByMinutes && latestPunch);
  
-  const overByLabel: Record<string, number> = recentAttendance
+  const overByLabel: Record<string, number> = todayRecord
     ? {
-        'Check in': recentAttendance.lateByMinutes,
-        'Lunch in': recentAttendance.lunchOverMinutes,
-        'Afternoon break in': recentAttendance.breakOverMinutes,
+        'Check in': todayRecord.lateByMinutes,
+        'Lunch in': todayRecord.lunchOverMinutes,
+        'Afternoon break in': todayRecord.breakOverMinutes,
       }
     : {};
-  const lateParts = recentAttendance
-    ? [
-        { label: 'Arrival', mins: recentAttendance.lateByMinutes },
-        { label: 'Lunch', mins: recentAttendance.lunchOverMinutes },
-        { label: 'Break', mins: recentAttendance.breakOverMinutes },
-      ].filter((part) => part.mins > 0)
-    : [];
 
   const pendingCount = applications.filter((item) => item.status === 'Pending').length;
   const payday = nextPayday(today);
@@ -268,14 +216,50 @@ export default function HomeScreen() {
           end={{ x: 1, y: 1 }}
           style={[styles.hero, isDesktop && styles.desktopHero]}
         >
-          <View style={styles.introMeta}>
-            <Text style={styles.heroEyebrow}>{companyBranding.name.toUpperCase()} / EMPLOYEE PORTAL</Text>
-            <Text style={styles.heroDate}>{formattedDate}</Text>
+          <View style={[styles.heroContent, isMobile && styles.mobileHeroContent]}>
+            <View
+              style={[
+                styles.heroPhotoFrame,
+                isMobile && styles.mobileHeroPhotoFrame,
+                isCompactMobile && styles.compactHeroPhotoFrame,
+              ]}
+            >
+              {profilePicture ? (
+                <Image
+                  source={profilePicture}
+                  contentFit="cover"
+                  style={styles.heroPhoto}
+                  accessibilityLabel={`${user?.displayName ?? 'Employee'} profile picture`}
+                />
+              ) : (
+                <Text style={styles.heroPhotoInitials}>{initials(user?.displayName ?? firstName)}</Text>
+              )}
+            </View>
+            <View
+              style={[
+                styles.heroCopy,
+                isMobile && styles.mobileHeroCopy,
+                isCompactMobile && styles.compactMobileHeroCopy,
+              ]}
+            >
+              <View style={[styles.introMeta, isMobile && styles.mobileIntroMeta]}>
+                <Text style={styles.heroEyebrow}>EMPLOYEE PORTAL</Text>
+                <Text style={styles.heroDate}>{formattedDate}</Text>
+              </View>
+              <Text
+                style={[
+                  styles.heroTitle,
+                  isDesktop && styles.desktopHeroTitle,
+                  isMobile && styles.mobileHeroTitle,
+                  isCompactMobile && styles.compactMobileHeroTitle,
+                ]}
+              >
+                {firstName ? `${greeting}, ${firstName}` : greeting}
+              </Text>
+              <Text style={styles.heroProfileName}>{user?.displayName ?? firstName}</Text>
+              <Text style={styles.heroSummary}>Your workday, requests, and updates in one place.</Text>
+            </View>
           </View>
-          <Text style={[styles.heroTitle, isDesktop && styles.desktopHeroTitle]}>
-            {firstName ? `${greeting}, ${firstName}` : greeting}
-          </Text>
-          <Text style={styles.heroSummary}>Your workday, requests, and updates in one place.</Text>
         </LinearGradient>
         </View>
 
@@ -316,39 +300,18 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>Quick access</Text>
-          <View style={[styles.quickGrid, isDesktop && styles.desktopQuickGrid]}>
-            {workspace.links.map((item) => (
-              <Pressable
-                key={item.label}
-                accessibilityRole="link"
-                onPress={() => router.push(item.route as never)}
-                style={({ pressed }) => [styles.quickCard, isDesktop && styles.desktopQuickCard, pressed && styles.pressed]}
-              >
-                <View style={styles.quickIcon}>
-                  <Text style={styles.quickGlyph}>{routeGlyphs[item.route] ?? '•'}</Text>
-                </View>
-                <View style={styles.quickCopy}>
-                  <Text style={styles.quickTitle}>{item.label}</Text>
-                  <Text style={styles.quickDetail}>{item.detail}</Text>
-                </View>
-                <Text style={styles.quickArrow}>→</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
         <View style={[styles.columns, isDesktop && styles.desktopColumns]}>
           <View style={[styles.column, isDesktop && styles.desktopColumn]}>
             <View style={[styles.columnHeading, isDesktop && styles.desktopColumnHeading]}>
               <View>
                 <Text style={styles.eyebrow}>ATTENDANCE</Text>
                 <Text style={[styles.sectionTitle, isDesktop && styles.desktopSectionTitle]}>
-                  {lastAttendanceWasYesterday ? 'Yesterday' : 'Last workday'}
+                  Today
                 </Text>
               </View>
-              <Text style={styles.panelDate}>{recentAttendanceDate}</Text>
+              <Text style={styles.panelDate}>
+                {formatDemoDate(dateKey(today), { weekday: 'short', month: 'short', day: 'numeric' })}
+              </Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -358,44 +321,40 @@ export default function HomeScreen() {
             >
               <View style={styles.cardTop}>
                 <View>
-                  <Text style={styles.hoursValue}>{recentAttendance?.totalWorked ?? '—'}</Text>
+                  <Text style={styles.hoursValue}>{latestPunch?.time ?? '—'}</Text>
                   <Text style={styles.hoursCaption}>
-                    {recentAttendance
-                      ? `of ${formatDemoDuration(recentAttendance.scheduledPaidMinutes)} scheduled`
-                      : 'No record'}
+                    {latestPunch
+                      ? `${latestPunch.direction} · ${latestPunch.label}`
+                      : todayRecord?.status === 'SIL'
+                        ? 'Service Incentive Leave · no punches expected'
+                        : todayRecord?.status === 'LWOP'
+                          ? 'Unpaid leave · no punches expected'
+                          : todayRecord
+                            ? 'No sample punch recorded yet'
+                            : 'No scheduled shift today'}
                   </Text>
                 </View>
-                {recentAttendance?.status === 'Late' ? (
+                {todayIsLate ? (
                   <View style={styles.lateBadge}>
-                    <Text style={styles.lateText}>Late {recentAttendance.totalLateMinutes} min</Text>
+                    <Text style={styles.lateText}>Late {todayRecord?.lateByMinutes} min</Text>
                   </View>
-                ) : recentAttendance ? (
+                ) : latestPunch ? (
                   <View style={styles.onTimeBadge}>
                     <Text style={styles.onTimeText}>On time</Text>
                   </View>
-                ) : null}
+                ) : (
+                  <View style={styles.todayPendingBadge}>
+                    <Text style={styles.todayPendingText}>
+                      {todayRecord ? 'Waiting for IN' : 'No shift'}
+                    </Text>
+                  </View>
+                )}
               </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${hoursRatio * 100}%` }]} />
-              </View>
-              {recentAttendance ? (
-                <Text style={styles.hoursMath}>
-                  {formatDemoDuration(recentAttendance.scheduledPaidMinutes)} standard paid day; {formatDemoDuration(recentAttendance.unpaidLunchMinutes)} lunch is unpaid but does not reduce the target. {formatDemoDuration(recentAttendance.paidBreakMinutes)} paid break included; {recentAttendance.totalLateMinutes > 0
-                    ? `${formatDemoDuration(recentAttendance.totalLateMinutes)} late time/overages deducted.`
-                    : 'No late time/overages deducted.'}
-                </Text>
-              ) : null}
-              {lateParts.length ? (
-                <View style={styles.chipRow}>
-                  {lateParts.map((part) => (
-                    <View key={part.label} style={styles.chip}>
-                      <Text style={styles.chipText}>{part.label} +{part.mins}m</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
+              <Text style={styles.todayShiftText}>
+                {todayRecord ? `Sample shift · ${todayRecord.scheduledShift}` : 'No scheduled sample shift today'}
+              </Text>
               <View style={styles.punchList}>
-                {recentAttendance?.punches.map((punch) => (
+                {todayRecord?.punches.map((punch) => (
                   <PunchRow
                     key={punch.label}
                     label={punch.label}
@@ -405,6 +364,9 @@ export default function HomeScreen() {
                   />
                 ))}
               </View>
+              <Text style={styles.todaySampleHint}>
+                Fictional sample punches only · not live attendance data
+              </Text>
 
               <View style={styles.monthStrip}>
                 <View style={styles.monthStat}>
@@ -559,7 +521,7 @@ export default function HomeScreen() {
           <View style={styles.supportCopy}>
             <Text style={styles.supportTitle}>Here when you need us</Text>
             <Text style={styles.supportDescription}>
-              Find request instructions or send a question to the support team.
+              Find instructions for common requests and employee services.
             </Text>
           </View>
           <View style={styles.supportActions}>
@@ -570,14 +532,6 @@ export default function HomeScreen() {
               style={({ pressed }) => [styles.helpButton, pressed && styles.pressed]}
             >
               <Text style={styles.helpButtonText}>Open Help</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/ticket')}
-              hitSlop={8}
-              style={({ pressed }) => [styles.ticketButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.ticketButtonText}>Submit a ticket</Text>
             </Pressable>
           </View>
         </View>
@@ -663,19 +617,43 @@ function MilestoneGroup({
 const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   content: { width: '100%', padding: 20, paddingBottom: 40 },
-  desktopContent: { alignSelf: 'center', maxWidth: 1320, padding: 42, paddingBottom: 60 },
+  desktopContent: { alignSelf: 'center', maxWidth: 1320, padding: 40, paddingBottom: 60 },
 
 
   heroWrap: { marginBottom: 20 },
   desktopHeroWrap: { marginBottom: 20 },
-  hero: { padding: 22, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  desktopHero: { padding: 24, borderRadius: 14, borderWidth: 1, borderColor: colors.border },
+  hero: { minHeight: 206, justifyContent: 'center', padding: 26, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  desktopHero: { minHeight: 246, padding: 38, borderRadius: 28, borderWidth: 1, borderColor: colors.border },
+  heroContent: { flexDirection: 'row', alignItems: 'center', gap: 22 },
+  mobileHeroContent: { position: 'relative', flexDirection: 'column', alignItems: 'stretch', gap: 0 },
+  heroPhotoFrame: {
+    width: 175,
+    height: 175,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  mobileHeroPhotoFrame: { position: 'absolute', top: 0, right: 0, zIndex: 1, width: 68, height: 68, borderRadius: 18 },
+  compactHeroPhotoFrame: { width: 56, height: 56, borderRadius: 15 },
+  heroPhoto: { width: '100%', height: '100%' },
+  heroPhotoInitials: { color: colors.brown, fontSize: 24, fontWeight: '800' },
+  heroCopy: { flex: 1, minWidth: 0 },
+  mobileHeroCopy: { paddingTop: 0 },
+  compactMobileHeroCopy: { paddingTop: 0 },
   introMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  heroEyebrow: { color: '#7A2E24', fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  mobileIntroMeta: { flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', gap: 4, paddingRight: 76 },
+  heroEyebrow: { color: '#7A2E24', fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
   heroDate: { color: 'rgba(43,33,24,0.7)', fontSize: 12, fontWeight: '600' },
-  heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 30, fontWeight: '800', letterSpacing: -0.8 },
-  desktopHeroTitle: { fontSize: 40, letterSpacing: -1.2 },
-  heroSummary: { maxWidth: 680, marginTop: 6, color: 'rgba(43,33,24,0.72)', fontSize: 13, lineHeight: 20 },
+  heroTitle: { marginTop: 18, color: '#2B2118', fontSize: 32, fontWeight: '800', letterSpacing: -1 },
+  mobileHeroTitle: { marginTop: 32, fontSize: 29, lineHeight: 34 },
+  compactMobileHeroTitle: { marginTop: 22, fontSize: 27, lineHeight: 32 },
+  desktopHeroTitle: { fontSize: 46, letterSpacing: -1.5 },
+  heroProfileName: { marginTop: 4, color: '#51391D', fontSize: 14, fontWeight: '700' },
+  heroSummary: { maxWidth: 680, marginTop: 8, color: 'rgba(43,33,24,0.72)', fontSize: 14, lineHeight: 22 },
 
 
   notice: {
@@ -685,7 +663,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     marginBottom: 16,
     paddingVertical: 14,
     paddingRight: 16,
-    borderRadius: 5,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -704,7 +682,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     flex: 1,
     minWidth: 0,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 18,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -715,53 +693,17 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     elevation: 2,
   },
   mobileTile: { flexBasis: '47%', flexGrow: 1 },
-  tileAccent: { width: 28, height: 3, marginBottom: 11, borderRadius: 2, backgroundColor: colors.yellowDeep },
+  tileAccent: { width: 30, height: 4, marginBottom: 12, borderRadius: 2, backgroundColor: colors.yellowDeep },
   tileAccentAlert: { backgroundColor: colors.danger },
   tileLabel: { color: colors.grayMuted, fontSize: 11, fontWeight: '700' },
-  tileValue: { marginTop: 8, color: colors.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  tileValue: { marginTop: 8, color: colors.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.8 },
   tileValueAlert: { color: colors.danger },
   tileCaption: { marginTop: 3, color: colors.grayMuted, fontSize: 11 },
 
 
-  section: { marginBottom: 32 },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700', letterSpacing: -0.25 },
   desktopSectionTitle: { fontSize: 21 },
   eyebrow: { marginBottom: 5, color: colors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-
-
-  quickGrid: { marginTop: 14, gap: 10 },
-  desktopQuickGrid: { flexDirection: 'row', gap: 14 },
-  quickCard: {
-    minHeight: 78,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#292725',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  desktopQuickCard: { flex: 1, minWidth: 0 },
-  quickIcon: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: colors.yellowLight,
-  },
-  quickGlyph: { color: colors.brown, fontSize: 19, fontWeight: '700' },
-  quickCopy: { flex: 1, minWidth: 0 },
-  quickTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  quickDetail: { marginTop: 3, color: colors.grayMuted, fontSize: 12, lineHeight: 17 },
-  quickArrow: { color: colors.brown, fontSize: 18 },
-
 
   columns: { gap: 28, marginBottom: 32 },
   desktopColumns: { flexDirection: 'row', alignItems: 'stretch', gap: 32 },
@@ -772,7 +714,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   panelDate: { color: colors.grayMuted, fontSize: 12 },
   card: {
     padding: 18,
-    borderRadius: 10,
+    borderRadius: 18,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -785,15 +727,19 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   hoursValue: { color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
   hoursCaption: { marginTop: 2, color: colors.grayMuted, fontSize: 12 },
-  lateBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3, backgroundColor: colors.grayLight },
+  lateBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.grayLight },
   lateText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
-  onTimeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3, backgroundColor: colors.yellowLight },
+  onTimeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.yellowLight },
   onTimeText: { color: colors.brownDark, fontSize: 12, fontWeight: '700' },
+  todayPendingBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.grayLight },
+  todayPendingText: { color: colors.grayDark, fontSize: 12, fontWeight: '700' },
+  todayShiftText: { marginTop: 10, color: colors.grayMuted, fontSize: 11 },
+  todaySampleHint: { marginTop: 10, color: colors.grayMuted, fontSize: 10, lineHeight: 15 },
   progressTrack: { height: 8, marginTop: 14, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.grayLight },
   progressFill: { height: '100%', borderRadius: 4, backgroundColor: colors.brown },
   hoursMath: { marginTop: 10, color: colors.grayMuted, fontSize: 11, lineHeight: 16 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 3, backgroundColor: colors.grayLight },
+  chip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.grayLight },
   chipText: { color: colors.danger, fontSize: 11, fontWeight: '700' },
   punchList: { marginTop: 12 },
   punchRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.grayLight },
@@ -808,7 +754,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     alignItems: 'center',
     marginTop: 16,
     paddingVertical: 12,
-    borderRadius: 4,
+    borderRadius: 18,
     backgroundColor: colors.background,
   },
   monthStat: { flex: 1, alignItems: 'center' },
@@ -841,7 +787,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   announcement: { paddingVertical: 4 },
   announcementDivider: { marginTop: 12, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
   announcementMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  announcementChip: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 3, backgroundColor: colors.yellowLight },
+  announcementChip: { flexShrink: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: colors.yellowLight },
   announcementCategory: { color: colors.brownDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
   announcementDate: { color: colors.grayMuted, fontSize: 11 },
   announcementTitle: { marginTop: 8, color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 21 },
@@ -882,7 +828,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     justifyContent: 'space-between',
     gap: 16,
     padding: 20,
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -894,9 +840,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   supportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   helpButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 7, backgroundColor: colors.yellowLight },
   helpButtonText: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  ticketButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 7, backgroundColor: colors.brown },
-  ticketButtonText: { color: colors.white, fontSize: 13, fontWeight: '700' },
-
   pressed: { opacity: 0.8 },
   footer: { marginTop: 24, color: colors.grayMuted, fontSize: 11, lineHeight: 15 },
 });

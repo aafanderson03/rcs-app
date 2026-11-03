@@ -1,8 +1,11 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, type ImageSourcePropType } from 'react-native';
 import { DEMO_PASSWORD, demoAccounts } from '@/data/demo-accounts';
+
+export type ProfilePictureSource = ImageSourcePropType;
 
 export type EmployeeType = 'employee' | 'merchandiser' | 'guard' | 'subcontractor';
 export type Company = { slug: string; name: string };
@@ -17,6 +20,10 @@ export type AuthUser = {
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
+  profilePicture: ProfilePictureSource | null;
+  hasCustomProfilePicture: boolean;
+  profilePictureError: string | null;
+  setProfilePicture: (dataUri: string | null) => Promise<void>;
   signIn: (username: string, password: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
 };
@@ -24,6 +31,15 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const configuredApiUrl = process.env.EXPO_PUBLIC_AUTH_API_URL;
 export const isStandaloneDemoMode = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+const profilePictureStorageKey = (userId: string) => `@rcs/profile-picture/${userId}`;
+const rcsDemoProfilePhoto: ProfilePictureSource = require('@/assets/images/2X2.png');
+
+function withDemoDisplayName(user: AuthUser): AuthUser {
+  if (user.company.slug === 'rcs-eastern-intertrade' && user.username === 'demo') {
+    return { ...user, displayName: 'Aaron Anthony Anderson' };
+  }
+  return user;
+}
 
 function getAuthApiUrl() {
   const isAndroidEmulator = Platform.OS === 'android' && !Device.isDevice;
@@ -71,15 +87,53 @@ const apiUrl = getAuthApiUrl();
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [profilePicture, setProfilePictureUri] = useState<string | null>(null);
+  const [profilePictureError, setProfilePictureError] = useState<string | null>(null);
+  const userId = user?.id;
+  const isRcsDemoAccount =
+    user?.company.slug === 'rcs-eastern-intertrade' && user.username === 'demo';
+  useEffect(() => {
+    let active = true;
+    if (!userId) return;
+
+    AsyncStorage.getItem(profilePictureStorageKey(userId))
+      .then((storedPicture) => {
+        if (active) setProfilePictureUri(storedPicture);
+      })
+      .catch((error: unknown) => {
+        console.error('Unable to load the saved profile picture.', error);
+        if (active) setProfilePictureError('Could not load the saved profile picture.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
     token,
+    profilePicture: profilePicture
+      ? { uri: profilePicture }
+      : isRcsDemoAccount
+        ? rcsDemoProfilePhoto
+        : null,
+    hasCustomProfilePicture: profilePicture !== null,
+    profilePictureError,
+    async setProfilePicture(dataUri) {
+      if (!user) throw new Error('Sign in before saving a profile picture.');
+      const key = profilePictureStorageKey(user.id);
+      if (dataUri) await AsyncStorage.setItem(key, dataUri);
+      else await AsyncStorage.removeItem(key);
+      setProfilePictureUri(dataUri);
+      setProfilePictureError(null);
+    },
     async signIn(username, password) {
       if (isStandaloneDemoMode) {
         const account = demoAccounts.find((candidate) => candidate.username === username.trim().toLowerCase());
         if (!account || password !== DEMO_PASSWORD) throw new Error('Demo sign-in failed. Check the demo username and password.');
         setToken(null);
+        setProfilePictureUri(null);
         setUser(account.user);
         return account.user;
       }
@@ -92,7 +146,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Sign-in failed.');
       setToken(data.token as string);
-      const authenticatedUser = data.user as AuthUser;
+      const authenticatedUser = withDemoDisplayName(data.user as AuthUser);
+      setProfilePictureUri(null);
       setUser(authenticatedUser);
       return authenticatedUser;
     },
@@ -106,13 +161,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
           setToken(null);
           setUser(null);
+          setProfilePictureUri(null);
+          setProfilePictureError(null);
         }
       } else {
         setToken(null);
         setUser(null);
+        setProfilePictureUri(null);
+        setProfilePictureError(null);
       }
     },
-  }), [token, user]);
+  }), [isRcsDemoAccount, profilePicture, profilePictureError, token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

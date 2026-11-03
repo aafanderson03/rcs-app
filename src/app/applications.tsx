@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   ChoicePicker,
+  DateRangeFilter,
   EmptyState,
   PageHeading,
   PortalCalendar,
@@ -29,7 +30,6 @@ const transactionTypes = [
 ];
 const typeFilters = ['All transaction types', ...transactionTypes];
 const statusFilters = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
-const trackedStatuses = ['Pending', 'Approved', 'Disapproved', 'Cancelled'];
 
 type RequestField = {
   key: string;
@@ -382,7 +382,8 @@ export default function ApplicationsScreen() {
   const [to, setTo] = useState('');
   const selectedApplication = applications.find((item) => item.id === selectedId) ?? null;
 
-  const baseApplications = applications.filter((item) =>
+  const invalidDateRange = Boolean(from && to && from > to);
+  const baseApplications = invalidDateRange ? [] : applications.filter((item) =>
     (transactionFilter === 'All transaction types' || item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile'))) &&
     (!from || item.submittedAt >= from) &&
     (!to || item.submittedAt <= to)
@@ -436,19 +437,17 @@ export default function ApplicationsScreen() {
         contentContainerStyle={[styles.content, width < 600 && styles.mobileContent, compactScreen && styles.compactContent, isDesktop && styles.desktopContent]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heading}>
-          <Text style={styles.eyebrow}>EMPLOYEE SELF-SERVICE</Text>
-          <Text style={[styles.title, isDesktop && styles.desktopTitle]}>Applications</Text>
-          <Text style={styles.subtitle}>
-            Start a request or check the status of applications you have submitted.
-          </Text>
-        </View>
+        <PageHeading
+          title="Applications"
+          description="Start a request or check the status of applications you have submitted."
+        />
 
         <PreviewNotice>All records are fictional presentation data. Forms can be submitted to local demo history only; no live employee system is contacted.</PreviewNotice>
         {lastSubmission ? <View style={styles.receiptCard}><Text style={styles.receiptTitle}>Demo request submitted</Text><Text style={styles.applicationSummary}>{lastSubmission.summary}</Text><Text style={styles.applicationMeta}>Receipt {lastSubmission.id} · Added to this device&apos;s demo history</Text></View> : null}
 
         <View style={[styles.contentColumns, isDesktop && styles.desktopContentColumns]}>
-          <View style={[styles.startCard, isDesktop && styles.desktopStartCard, openPagePicker === 'start-transaction' && styles.openPickerCard]}>
+          <View style={[styles.startColumn, isDesktop && styles.desktopStartColumn]}>
+            <View style={[styles.startCard, openPagePicker === 'start-transaction' && styles.openPickerCard]}>
             <View style={styles.cardHeading}>
               <View style={styles.cardNumber}>
                 <Text style={styles.cardNumberText}>1</Text>
@@ -491,9 +490,37 @@ export default function ApplicationsScreen() {
               </Pressable>
             </View>
             {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+            </View>
+            <View style={styles.trackerCard}>
+              <Text style={styles.listTitle}>Request tracker</Text>
+              <Text style={[styles.listSubtitle, styles.trackerSubtitle]}>Select a status to filter your submitted requests.</Text>
+              <View style={styles.trackerStatuses}>
+                {statusFilters.map((name) => {
+                  const isAll = name === 'All statuses';
+                  const count = isAll
+                    ? baseApplications.length
+                    : baseApplications.filter((item) => item.status === name).length;
+                  const selected = statusFilter === name;
+                  return (
+                    <Pressable
+                      key={name}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${count} ${isAll ? 'total' : name.toLowerCase()} requests. Tap to filter.`}
+                      onPress={() => setStatusFilter(selected && !isAll ? 'All statuses' : name)}
+                      style={({ pressed }) => [styles.trackerStatus, selected && styles.tileSelected, pressed && styles.pressed]}
+                    >
+                      <View style={[styles.tileAccent, { backgroundColor: isAll ? palette.grayMuted : statusColors[name] }]} />
+                      <Text style={styles.tileLabel}>{isAll ? 'All' : name}</Text>
+                      <Text style={styles.tileValue}>{count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
           </View>
 
-          <View style={[styles.listSection, isDesktop && styles.desktopListSection]}>
+          <View style={[styles.listSection, styles.submittedCard, isDesktop && styles.desktopListSection]}>
             <View style={styles.listHeading}>
               <View style={styles.listHeadingCopy}>
                 <Text style={styles.listTitle}>Submitted applications</Text>
@@ -523,30 +550,6 @@ export default function ApplicationsScreen() {
               </View>
             </View>
 
-            <View style={styles.tiles}>
-              {statusFilters.map((name) => {
-                const isAll = name === 'All statuses';
-                const count = isAll
-                  ? baseApplications.length
-                  : baseApplications.filter((item) => item.status === name).length;
-                const selected = statusFilter === name;
-                return (
-                  <Pressable
-                    key={name}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${count} ${isAll ? 'total' : name.toLowerCase()} requests. Tap to filter.`}
-                    onPress={() => setStatusFilter(selected && !isAll ? 'All statuses' : name)}
-                    style={({ pressed }) => [styles.tile, selected && styles.tileSelected, pressed && styles.pressed]}
-                  >
-                    <View style={[styles.tileAccent, { backgroundColor: isAll ? palette.grayMuted : statusColors[name] }]} />
-                    <Text style={styles.tileValue}>{count}</Text>
-                    <Text style={styles.tileLabel}>{isAll ? 'All' : name}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             <View style={[styles.filters, isDesktop && styles.desktopFilters]}>
               <View
                 style={[
@@ -564,41 +567,46 @@ export default function ApplicationsScreen() {
                 />
               </View>
               <View style={styles.dateRow}>
-                <View style={styles.dateField}>
-                  <Text style={styles.pickerLabel}>From</Text>
-                  <TextInput
-                    accessibilityLabel="From date"
-                    value={from}
-                    onChangeText={setFrom}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={palette.grayMuted}
-                    style={styles.formInput}
-                  />
-                </View>
-                <View style={styles.dateField}>
-                  <Text style={styles.pickerLabel}>To</Text>
-                  <TextInput
-                    accessibilityLabel="To date"
-                    value={to}
-                    onChangeText={setTo}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={palette.grayMuted}
-                    style={styles.formInput}
-                  />
-                </View>
+                <DateRangeFilter
+                  from={from}
+                  to={to}
+                  onChangeFrom={setFrom}
+                  onChangeTo={setTo}
+                  onClear={() => {
+                    setFrom('');
+                    setTo('');
+                  }}
+                />
               </View>
             </View>
 
             {view === 'list' ? (
-              <View style={styles.applicationList}>
-                {filteredApplications.length ? (
-                  filteredApplications.map((item) => (
-                    <ApplicationCard key={item.id} item={item} onPress={() => setSelectedId(item.id)} />
-                  ))
-                ) : (
-                  <EmptyState title="No matching sample requests" description="Change the transaction or status filters to see other demo entries." />
-                )}
-              </View>
+              isDesktop ? (
+                <ScrollView
+                  style={styles.desktopApplicationsScroll}
+                  contentContainerStyle={styles.applicationList}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator
+                >
+                  {filteredApplications.length ? (
+                    filteredApplications.map((item) => (
+                      <ApplicationCard key={item.id} item={item} onPress={() => setSelectedId(item.id)} />
+                    ))
+                  ) : (
+                    <EmptyState title="No matching sample requests" description="Change the transaction or status filters to see other demo entries." />
+                  )}
+                </ScrollView>
+              ) : (
+                <View style={styles.applicationList}>
+                  {filteredApplications.length ? (
+                    filteredApplications.map((item) => (
+                      <ApplicationCard key={item.id} item={item} onPress={() => setSelectedId(item.id)} />
+                    ))
+                  ) : (
+                    <EmptyState title="No matching sample requests" description="Change the transaction or status filters to see other demo entries." />
+                  )}
+                </View>
+              )
             ) : (
               <View>
                 <PortalCalendar
@@ -627,64 +635,10 @@ export default function ApplicationsScreen() {
               </View>
             )}
 
-            <StatusBreakdown rows={filteredApplications} />
           </View>
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function StatusBreakdown({ rows }: { rows: DemoApplication[] }) {
-  const { styles, statusColors } = useApplicationStyles();
-  if (!rows.length) return null;
-
-  const categories = transactionTypes
-    .map((type) => {
-      const typeRows = rows.filter((item) => item.type === type);
-      const byStatus = trackedStatuses.map((name) => ({
-        name,
-        count: typeRows.filter((item) => item.status === name).length,
-      }));
-      return { type, byStatus, total: typeRows.length };
-    })
-    .sort((a, b) => b.total - a.total || a.type.localeCompare(b.type));
-  const max = Math.max(1, ...categories.map((item) => item.total));
-
-  return (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>Breakdown by transaction type</Text>
-      <Text style={styles.listSubtitle}>Follows the filters above.</Text>
-      <View style={styles.chartLegend}>
-        {trackedStatuses.map((name) => (
-          <View key={name} style={styles.legendItem}>
-            <View style={[styles.legendSwatch, { backgroundColor: statusColors[name] }]} />
-            <Text style={styles.legendLabel}>{name}</Text>
-          </View>
-        ))}
-      </View>
-      <View style={styles.chartList}>
-        {categories.map(({ type, byStatus, total }) => (
-          <View key={type} style={[styles.chartRow, total === 0 && styles.chartRowEmpty]}>
-            <Text style={styles.chartName} numberOfLines={1}>{type}</Text>
-            <View
-              accessible
-              accessibilityLabel={`${type}: ${byStatus.map((s) => `${s.count} ${s.name.toLowerCase()}`).join(', ')}`}
-              style={styles.chartTrack}
-            >
-              {total > 0 ? (
-                <View style={[styles.chartFill, { width: `${(total / max) * 100}%` }]}>
-                  {byStatus.map(({ name, count }) =>
-                    count > 0 ? <View key={name} style={{ flex: count, backgroundColor: statusColors[name] }} /> : null
-                  )}
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.chartValue}>{total}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
   );
 }
 
@@ -1382,30 +1336,56 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   mobileContent: { padding: 18, paddingBottom: 32 },
   compactContent: { padding: 14, paddingBottom: 28 },
   desktopContent: { maxWidth: 1500, padding: 32, paddingBottom: 44 },
-  heading: { marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
-  eyebrow: { color: RcsColors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
-  title: { marginTop: 6, color: RcsColors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  desktopTitle: { fontSize: 32 },
-  subtitle: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 14, lineHeight: 21 },
   contentColumns: { gap: 18 },
-  desktopContentColumns: { gap: 24 },
+  desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
+  startColumn: { gap: 18 },
+  desktopStartColumn: { width: '36%', alignSelf: 'flex-start' },
   startCard: {
     minWidth: 0,
     zIndex: 1,
     padding: 22,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
-  desktopStartCard: { width: '100%' },
+  trackerCard: {
+    padding: 18,
+    borderRadius: 12,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  trackerSubtitle: { marginBottom: 14 },
+  trackerStatuses: { gap: 8 },
+  trackerStatus: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: RcsColors.background,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+    overflow: 'hidden',
+  },
+  submittedCard: {
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  desktopApplicationsScroll: { maxHeight: 480, flexGrow: 0 },
   cardHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: 22 },
   cardNumber: {
     width: 38,
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.yellowLight,
   },
   cardNumberText: { color: RcsColors.brown, fontSize: 16, fontWeight: '800' },
@@ -1413,7 +1393,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   cardTitle: { color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
   cardSubtitle: { marginTop: 3, color: RcsColors.grayMuted, fontSize: 12 },
   startRow: { gap: 16 },
-  desktopStartRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  desktopStartRow: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
   transactionPicker: { flex: 1, minWidth: 0, zIndex: 20, elevation: 20 },
   picker: { minWidth: 0 },
   openPicker: { zIndex: 100, elevation: 100 },
@@ -1425,7 +1405,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 15,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1443,7 +1423,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     maxHeight: 280,
     marginTop: 5,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1467,21 +1447,21 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     gap: 8,
     marginTop: 18,
     paddingHorizontal: 18,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.brown,
   },
-  desktopContinueButton: { minWidth: 150, marginTop: 0 },
+  desktopContinueButton: { width: '100%', marginTop: 0 },
   continueButtonDisabled: { opacity: 0.55 },
   continueButtonText: { color: RcsColors.white, fontSize: 14, fontWeight: '700' },
   continueArrow: { color: RcsColors.yellow, fontSize: 22, lineHeight: 25 },
   notice: { marginTop: 12, color: RcsColors.brown, fontSize: 12, lineHeight: 18 },
-  listSection: { minWidth: 0, marginTop: 32, zIndex: 2, elevation: 2 },
+  listSection: { flex: 1, minWidth: 0, marginTop: 32, zIndex: 2, elevation: 2 },
   listHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 17 },
   listHeadingCopy: { flex: 1, minWidth: 160 },
   listTitle: { color: RcsColors.text, fontSize: 19, fontWeight: '700' },
   listSubtitle: { marginTop: 4, color: RcsColors.grayMuted, fontSize: 12 },
   viewToggle: { flexDirection: 'row', gap: 4 },
-  viewToggleOption: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 4, backgroundColor: RcsColors.grayLight },
+  viewToggleOption: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 9, backgroundColor: RcsColors.grayLight },
   selectedView: { backgroundColor: RcsColors.yellowLight },
   viewToggleText: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
   selectedViewText: { color: RcsColors.brownDark },
@@ -1492,26 +1472,26 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   desktopListSection: { marginTop: 0 },
   calendarNote: { marginTop: 12, color: RcsColors.grayMuted, fontSize: 12 },
   applicationList: { gap: 10 },
-  applicationCard: { padding: 15, borderRadius: 4, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
+  applicationCard: { padding: 16, borderRadius: 12, backgroundColor: RcsColors.surface, borderWidth: 1, borderColor: RcsColors.border },
   applicationCardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
   applicationCardMain: { flex: 1, minWidth: 0 },
   applicationType: { color: RcsColors.brown, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  statusPill: { overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 3, backgroundColor: RcsColors.yellowLight, color: RcsColors.brownDark, fontSize: 10, fontWeight: '700' },
+  statusPill: { overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: RcsColors.yellowLight, color: RcsColors.brownDark, fontSize: 10, fontWeight: '700' },
   approvedPill: { backgroundColor: '#DDEBDD', color: '#315A36' },
   disapprovedPill: { backgroundColor: '#F3DFDA', color: '#8A3F32' },
   cancelledPill: { backgroundColor: RcsColors.grayLight, color: RcsColors.grayDark },
   applicationSummary: { marginTop: 9, color: RcsColors.brownDark, fontSize: 14, fontWeight: '700' },
   applicationMeta: { marginTop: 6, color: RcsColors.grayMuted, fontSize: 11 },
   cancellationReason: { marginTop: 8, color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
-  cancelLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 10, borderRadius: 4, backgroundColor: RcsColors.grayLight },
+  cancelLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 10, borderRadius: 9, backgroundColor: RcsColors.grayLight },
   cancelLinkText: { color: RcsColors.danger, fontSize: 12, fontWeight: '700' },
-  cancelConfirmation: { marginTop: 12, padding: 12, borderRadius: 4, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
+  cancelConfirmation: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
   cancelPrompt: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '700' },
   cancelReasonInput: { minHeight: 72, marginTop: 8 },
   cancelActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  keepRequestButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 4, backgroundColor: RcsColors.surface },
+  keepRequestButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 9, backgroundColor: RcsColors.surface },
   keepRequestText: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '700' },
-  cancelRequestButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 4, backgroundColor: RcsColors.danger },
+  cancelRequestButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 9, backgroundColor: RcsColors.danger },
   cancelButtonDisabled: { opacity: 0.5 },
   cancelRequestText: { color: RcsColors.white, fontSize: 12, fontWeight: '700' },
   calendarApplication: { marginTop: 10 },
@@ -1526,7 +1506,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1536,30 +1516,10 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   tileAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   tileValue: { color: RcsColors.text, fontSize: 24, fontWeight: '700' },
   tileLabel: { marginTop: 2, color: RcsColors.grayMuted, fontSize: 12, fontWeight: '600' },
-  chartCard: {
-    marginTop: 24,
-    padding: 20,
-    borderRadius: 4,
-    backgroundColor: RcsColors.surface,
-    borderWidth: 1,
-    borderColor: RcsColors.border,
-  },
-  chartTitle: { color: RcsColors.text, fontSize: 16, fontWeight: '700' },
-  chartLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  legendSwatch: { width: 12, height: 12, borderRadius: 3 },
-  legendLabel: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '600' },
-  chartList: { marginTop: 12 },
-  chartRow: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  chartRowEmpty: { opacity: 0.45 },
-  chartName: { width: 118, color: RcsColors.grayDark, fontSize: 13 },
-  chartTrack: { height: 16, flex: 1, borderRadius: 8, overflow: 'hidden', backgroundColor: RcsColors.grayLight },
-  chartFill: { height: '100%', flexDirection: 'row', gap: 2, borderRadius: 8, overflow: 'hidden' },
-  chartValue: { width: 28, textAlign: 'right', color: RcsColors.text, fontSize: 13, fontWeight: '700' },
   detailCard: {
     padding: 20,
     marginBottom: 16,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1575,7 +1535,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   },
   approverCopy: { flex: 1, minWidth: 0 },
   approverName: { color: RcsColors.text, fontSize: 14, fontWeight: '700' },
-  receiptCard: { padding: 16, marginBottom: 18, borderRadius: 4, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
+  receiptCard: { padding: 16, marginBottom: 18, borderRadius: 12, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.yellow },
   receiptTitle: { color: RcsColors.brownDark, fontSize: 14, fontWeight: '800' },
   pressed: { opacity: 0.75 },
   formBackButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 12, marginBottom: 16 },
@@ -1583,12 +1543,12 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   formSection: {
     padding: 22,
     marginBottom: 16,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
-  mobileFormSection: { padding: 16, borderRadius: 4 },
+  mobileFormSection: { padding: 16, borderRadius: 12 },
   repeatableSection: { zIndex: 1 },
   openFormSection: { zIndex: 100, elevation: 100 },
   addDependentButton: {
@@ -1597,7 +1557,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     justifyContent: 'center',
     marginTop: 12,
     paddingHorizontal: 14,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.yellowLight,
   },
   addDependentButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
@@ -1627,7 +1587,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     minHeight: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1644,7 +1604,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     maxHeight: 220,
     marginTop: 4,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1657,7 +1617,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     minHeight: 46,
     paddingHorizontal: 13,
     paddingVertical: 11,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -1675,7 +1635,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: RcsColors.border,
-    borderRadius: 5,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
   },
   checkboxChecked: { backgroundColor: RcsColors.brown, borderColor: RcsColors.brown },
@@ -1689,7 +1649,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.grayLight,
   },
   secondaryFormButtonText: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '700' },
@@ -1702,7 +1662,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 20,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.brown,
   },
   primaryFormButtonText: { color: RcsColors.white, fontSize: 13, fontWeight: '700' },
@@ -1710,12 +1670,12 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   reviewCard: {
     padding: 20,
     marginTop: 18,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.yellowLight,
     borderWidth: 1,
     borderColor: RcsColors.yellow,
   },
-  fillSampleButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, marginBottom: 16, borderRadius: 4, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.border },
+  fillSampleButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, marginBottom: 16, borderRadius: 10, backgroundColor: RcsColors.yellowLight, borderWidth: 1, borderColor: RcsColors.border },
   fillSampleButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   reviewTitle: { color: RcsColors.brownDark, fontSize: 17, fontWeight: '800' },
   reviewDescription: { marginTop: 5, marginBottom: 12, color: RcsColors.grayDark, fontSize: 12 },

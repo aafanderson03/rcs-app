@@ -145,7 +145,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     marginTop: 18,
     paddingHorizontal: 20,
     paddingVertical: 11,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.brown,
   },
   retryText: { color: RcsColors.white, fontSize: 14, fontWeight: '700' },

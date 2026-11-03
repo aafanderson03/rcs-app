@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { companies, employeeTypes, hashPassword } from './auth-shared.mjs';
+import { companies, demoAccountProfiles, employeeTypes, hashPassword } from './auth-shared.mjs';
 
 const databasePath = resolve(process.env.DATABASE_PATH || 'server/data/rcs_employee_dev.sqlite');
 await mkdir(dirname(databasePath), { recursive: true });
@@ -36,21 +36,31 @@ try {
        display_name = excluded.display_name, employee_type = excluded.employee_type,
        password_salt = excluded.password_salt, password_hash = excluded.password_hash, active = 1`
   );
-  const testAccounts = companies.map((company) => ({
-    company,
-    username: company.slug === companySlug ? username : company.demoUsername,
-    displayName: company.demoDisplayName,
-  }));
+  const testAccounts = demoAccountProfiles.map((profile) => {
+    const company = companies.find((candidate) => candidate.slug === profile.companySlug);
+    if (!company) throw new Error(`Unknown demo account company: ${profile.companySlug}.`);
+    const isConfiguredPrimaryAccount = profile.companySlug === companySlug && profile.username === company.demoUsername;
+    return {
+      company,
+      username: isConfiguredPrimaryAccount ? username : profile.username,
+      displayName: profile.displayName,
+      employeeType: isConfiguredPrimaryAccount ? employeeType : profile.employeeType,
+    };
+  });
   const usernames = testAccounts.map((account) => account.username.toLowerCase());
   if (new Set(usernames).size !== usernames.length) {
     throw new Error('Demo usernames must be unique across companies. Update AUTH_TEST_USERNAME or AUTH_TEST_COMPANY.');
   }
+  const displayNames = testAccounts.map((account) => account.displayName.trim().toLowerCase());
+  if (new Set(displayNames).size !== displayNames.length) {
+    throw new Error('Demo accounts must use unique display names.');
+  }
   for (const account of testAccounts) {
     const { salt, hash } = await hashPassword(password);
-    saveAccount.run(account.company.slug, account.username, account.displayName, employeeType, salt, hash);
+    saveAccount.run(account.company.slug, account.username, account.displayName, account.employeeType, salt, hash);
   }
 
-  console.log(`SQLite database ready at ${databasePath}. Local demo accounts (${employeeType}): ${testAccounts.map(({ username: demoUsername, displayName: demoName }) => `${demoUsername} (${demoName})`).join(', ')}.`);
+  console.log(`SQLite database ready at ${databasePath}. Seeded ${testAccounts.length} local demo account types across ${companies.length} companies.`);
   if (generatedPassword) console.log(`Generated shared demo password (shown once): ${password}`);
 } finally {
   database.close();

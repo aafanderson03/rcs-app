@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "rcs-eastern-intertrade",
+    "name": "RCS Eastern Intertrade Corp.",
+    "demoUsername": "demo",
+    "demoDisplayName": "Aaron Anthony Anderson",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "RCS Eastern Intertrade Corp.", "username": "demo", "displayName": "Aaron Anthony Anderson" },
+      { "employeeType": "merchandiser", "label": "REIC Merchandiser", "username": "demo-reic-merchandiser", "displayName": "Joy Manalo" },
+      { "employeeType": "guard", "label": "REIC Guard", "username": "demo-reic-guard", "displayName": "Ramon Bautista" }
+    ]
+  },
+  {
+    "slug": "brilliant-distribution",
+    "name": "Brilliant Distribution System",
+    "demoUsername": "demo-brilliant",
+    "demoDisplayName": "Rafael Cruz",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "Brilliant Distribution System", "username": "demo-brilliant", "displayName": "Rafael Cruz" },
+      { "employeeType": "guard", "label": "Brilliant Distribution System Guard", "username": "demo-brilliant-guard", "displayName": "Carlos Dela Cruz" }
+    ]
+  },
+  {
+    "slug": "tlz-eastland-realty",
+    "name": "TLZ Eastland Realty",
+    "demoUsername": "demo-tlz",
+    "demoDisplayName": "Bianca Reyes",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "TLZ Eastland Realty", "username": "demo-tlz", "displayName": "Bianca Reyes" },
+      { "employeeType": "subcontractor", "label": "TLZ Sub-Contractor", "username": "demo-tlz-subcontractor", "displayName": "Joel Navarro" },
+      { "employeeType": "guard", "label": "TLZ Guard", "username": "demo-tlz-guard", "displayName": "Eric Mendoza" }
+    ]
+  },
+  {
+    "slug": "friendship-supermarket",
+    "name": "Friendship Supermarket Inc.",
+    "demoUsername": "demo-fsi",
+    "demoDisplayName": "Paolo Garcia",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "Friendship Supermarket Inc.", "username": "demo-fsi", "displayName": "Paolo Garcia" },
+      { "employeeType": "merchandiser", "label": "FSI Merchandiser", "username": "demo-fsi-merchandiser", "displayName": "Trisha Reyes" },
+      { "employeeType": "subcontractor", "label": "FSI Sub-Contractor", "username": "demo-fsi-subcontractor", "displayName": "Daniel Aquino" },
+      { "employeeType": "guard", "label": "FSI Guard", "username": "demo-fsi-guard", "displayName": "Victor Ramos" }
+    ]
+  },
+  {
+    "slug": "metro-federal-steel",
+    "name": "Metro Federal Steel Corp.",
+    "demoUsername": "demo-mfsc",
+    "demoDisplayName": "Leah Mendoza",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "Metro Federal Steel Corp.", "username": "demo-mfsc", "displayName": "Leah Mendoza" },
+      { "employeeType": "guard", "label": "Metro Federal Steel Corp. Guard", "username": "demo-mfsc-guard", "displayName": "Alvin Castillo" }
+    ]
+  },
+  {
+    "slug": "core-gateway-colleges",
+    "name": "Core Gateway Colleges Inc.",
+    "demoUsername": "demo-cgci",
+    "demoDisplayName": "Marco Lim",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "Core Gateway Colleges Inc.", "username": "demo-cgci", "displayName": "Marco Lim" }
+    ]
+  },
+  {
+    "slug": "sweetpack-foods",
+    "name": "Sweetpack Foods",
+    "demoUsername": "demo-spf",
+    "demoDisplayName": "Nina Flores",
+    "accountTypes": [
+      { "employeeType": "employee", "label": "Sweetpack Foods", "username": "demo-spf", "displayName": "Nina Flores" }
+    ]
+  }
+]

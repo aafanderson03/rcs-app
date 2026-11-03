@@ -13,24 +13,26 @@ const SEEN_KEY = 'rcs-seen-notifications';
 
 type Notice = { id: string; title: string; detail: string; date: string; route: string };
 
-
-export function NotificationBell() {
+function useNotifications() {
   const router = useRouter();
   const { applications } = useDemoSubmissions();
   const { colorScheme } = useAppTheme();
-  const { width } = useWindowDimensions();
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(SEEN_KEY)
       .then((stored) => {
-        if (stored) setSeen(JSON.parse(stored) as string[]);
+        if (!stored) return;
+        const parsed: unknown = JSON.parse(stored);
+        if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === 'string')) {
+          throw new Error('Stored notification state is invalid.');
+        }
+        setSeen(parsed);
       })
-      .catch(() => undefined)
+      .catch((error: unknown) => {
+        console.error('Unable to load notification read state.', error);
+      })
       .finally(() => setLoaded(true));
   }, []);
 
@@ -71,15 +73,30 @@ export function NotificationBell() {
   }, [applications]);
 
   const unreadIds = loaded ? notices.filter((notice) => !seen.includes(notice.id)).map((n) => n.id) : [];
-
-  const close = () => {
-    setOpen(false);
-    const next = Array.from(new Set([...seen, ...notices.map((notice) => notice.id)]));
-    if (next.length !== seen.length) {
-      setSeen(next);
-      AsyncStorage.setItem(SEEN_KEY, JSON.stringify(next)).catch(() => undefined);
-    }
+  const persistSeen = (next: string[]) => {
+    setSeen(next);
+    AsyncStorage.setItem(SEEN_KEY, JSON.stringify(next)).catch((error: unknown) => {
+      console.error('Unable to save notification read state.', error);
+    });
   };
+  const markRead = (id: string) => {
+    if (!seen.includes(id)) persistSeen([...seen, id]);
+  };
+  const markAllRead = () => {
+    const next = Array.from(new Set([...seen, ...notices.map((notice) => notice.id)]));
+    if (next.length !== seen.length) persistSeen(next);
+  };
+
+  return { notices, unreadIds, markRead, markAllRead, router, colorScheme };
+}
+
+export function NotificationBell() {
+  const { notices, unreadIds, markRead, markAllRead, router, colorScheme } = useNotifications();
+  const { width } = useWindowDimensions();
+  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
 
   return (
     <View style={styles.wrap}>
@@ -105,19 +122,32 @@ export function NotificationBell() {
 
       {open ? (
         <View style={[styles.panel, { width: Math.min(330, width - 40) }]}>
-          <Text style={styles.panelTitle}>Notifications</Text>
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelTitle}>Notifications</Text>
+            {unreadIds.length ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={markAllRead}
+                style={({ pressed }) => [styles.markAllButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.markAllText}>Mark all read</Text>
+              </Pressable>
+            ) : null}
+          </View>
           {notices.length ? (
             notices.map((notice, index) => (
               <Pressable
                 key={notice.id}
                 accessibilityRole="link"
                 onPress={() => {
+                  markRead(notice.id);
                   close();
                   router.push(notice.route as never);
                 }}
                 style={({ pressed }) => [
                   styles.notice,
                   index > 0 && styles.noticeDivider,
+                  unreadIds.includes(notice.id) && styles.unreadNotice,
                   pressed && styles.pressed,
                 ]}
               >
@@ -147,9 +177,9 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
-    borderWidth: 3,
+    borderRadius: 14,
+    backgroundColor: colors.grayLight,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   bellImage: { 
@@ -175,7 +205,7 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     top: 52,
     right: 0,
     padding: 8,
-    borderRadius: 6,
+    borderRadius: 14,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -186,7 +216,11 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     elevation: 12,
   },
   panelTitle: { paddingHorizontal: 8, paddingVertical: 8, color: colors.text, fontSize: 14, fontWeight: '800' },
-  notice: { flexDirection: 'row', gap: 10, padding: 10, borderRadius: 4 },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  markAllButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 8 },
+  markAllText: { color: colors.brown, fontSize: 11, fontWeight: '700' },
+  notice: { flexDirection: 'row', gap: 8, paddingHorizontal: 5, paddingVertical: 10, borderRadius: 10 },
+  unreadNotice: { backgroundColor: colors.yellowLight },
   noticeDivider: { borderTopWidth: 1, borderTopColor: colors.border },
   dot: { width: 8, height: 8, marginTop: 5, borderRadius: 4, backgroundColor: colors.brown },
   dotRead: { backgroundColor: 'transparent' },

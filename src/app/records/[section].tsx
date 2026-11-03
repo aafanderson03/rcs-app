@@ -45,10 +45,14 @@ export default function EmployeeRecordScreen() {
   const { width } = useWindowDimensions();
   const { section } = useLocalSearchParams<{ section: string }>();
   const title = section ? sectionTitles[section] : undefined;
-  const identity = useMemo(() => resolveIdentity(user?.displayName), [user?.displayName]);
+  const identity = useMemo(
+    () => resolveIdentity(user?.displayName, user?.company.slug, user?.username),
+    [user?.company.slug, user?.displayName, user?.username],
+  );
+  const isRcsDemo = user?.company.slug === 'rcs-eastern-intertrade' && user.username === 'demo';
  
   const groups = useMemo<RecordGroup[]>(() => {
-    const custom = getEmployeeRecordGroups(section, identity);
+    const custom = getEmployeeRecordGroups(section, identity, isRcsDemo);
     if (custom) return custom;
     const sampleRows = (section ? demoRecordValues[section] : undefined) ?? [
       { label: 'Status', value: 'Sample section' },
@@ -64,7 +68,7 @@ export default function EmployeeRecordScreen() {
         })),
       },
     ];
-  }, [section, identity]);
+  }, [section, identity, isRcsDemo]);
 
   if (!title) {
     return (
@@ -82,7 +86,9 @@ export default function EmployeeRecordScreen() {
     <PortalPage>
       <PageHeading title={title} description={`Review your ${title.toLowerCase()} information.`} />
       <PreviewNotice>
-        Fictional sample content for presentation only. Sensitive identifiers are masked and no live employee system is connected.
+        {isRcsDemo
+          ? 'Career details are based on your resume. Contact, address, birth date, identifiers, scores, and compensation use altered synthetic demo values; career dates are shown at year-level precision.'
+          : 'Fictional sample content for presentation only. Sensitive identifiers are masked and no live employee system is connected.'}
       </PreviewNotice>
 
       <View style={[styles.card, width < 600 && styles.mobileCard]}>
@@ -172,7 +178,7 @@ function RecordGroupView({
 
 function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
-    card: { padding: 18, borderRadius: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    card: { padding: 18, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
     mobileCard: { padding: 14 },
     row: { gap: 6, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     label: { color: colors.grayMuted, fontSize: 11, fontWeight: '700' },
@@ -190,7 +196,7 @@ function createStyles(colors: Record<keyof RcsPalette, string>) {
     fieldWrap: { flexDirection: 'row', flexWrap: 'wrap' },
     fieldItem: { minWidth: 0, paddingVertical: 8, paddingRight: 12, gap: 3 },
     flagText: { lineHeight: 20 },
-    table: { marginTop: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 4, overflow: 'hidden' },
+    table: { marginTop: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden' },
     tableHeader: { flexDirection: 'row', backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border },
     tableHeading: { flex: 1, padding: 10, color: colors.grayDark, fontSize: 11, fontWeight: '800' },
     tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },

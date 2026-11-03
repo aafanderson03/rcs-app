@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
@@ -8,7 +8,7 @@ import { useAppTheme } from '@/contexts/theme-context';
 
 export function PortalPage({
   children,
-  maxWidth = 1180,
+  maxWidth = 1320,
 }: {
   children: ReactNode;
   maxWidth?: number;
@@ -40,9 +40,12 @@ export function PageHeading({
   const styles = usePortalStyles();
   return (
     <View style={styles.heading}>
-      <Text style={styles.eyebrow}>{eyebrow}</Text>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.description}>{description}</Text>
+      <View style={styles.headingAccent} />
+      <View style={styles.headingCopy}>
+        <Text style={styles.eyebrow}>{eyebrow}</Text>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.description}>{description}</Text>
+      </View>
     </View>
   );
 }
@@ -51,8 +54,14 @@ export function PreviewNotice({ children }: { children: ReactNode }) {
   const styles = usePortalStyles();
   return (
     <View style={styles.notice}>
-      <Text style={styles.noticeTitle}>Demo preview</Text>
-      <Text style={styles.noticeText}>{children}</Text>
+      <View style={styles.noticeAccent} />
+      <View style={styles.noticeIcon}>
+        <Text style={styles.noticeIconText}>i</Text>
+      </View>
+      <View style={styles.noticeCopy}>
+        <Text style={styles.noticeTitle}>Demo preview</Text>
+        <Text style={styles.noticeText}>{children}</Text>
+      </View>
     </View>
   );
 }
@@ -147,6 +156,175 @@ export function ChoicePicker({
   );
 }
 
+export function DateRangeFilter({
+  from,
+  to,
+  onChangeFrom,
+  onChangeTo,
+  onClear,
+}: {
+  from: string;
+  to: string;
+  onChangeFrom: (value: string) => void;
+  onChangeTo: (value: string) => void;
+  onClear: () => void;
+}) {
+  const styles = usePortalStyles();
+  const { height } = useWindowDimensions();
+  const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
+  const [draftDate, setDraftDate] = useState(() => new Date());
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const invalidRange = Boolean(from && to && from > to);
+
+  const openDatePicker = (field: 'from' | 'to') => {
+    const selected = parseDateKey(field === 'from' ? from : to) ?? new Date();
+    setDraftDate(selected);
+    setCalendarMonth(new Date(selected.getFullYear(), selected.getMonth(), 1));
+    setActiveField(field);
+  };
+
+  const closeDatePicker = () => setActiveField(null);
+  const applyDate = () => {
+    const value = toDateKey(draftDate);
+    if (activeField === 'from') onChangeFrom(value);
+    else if (activeField === 'to') onChangeTo(value);
+    closeDatePicker();
+  };
+
+  const renderDateButton = (field: 'from' | 'to', value: string) => (
+    <View style={styles.dateRangeField}>
+      <Text style={styles.pickerLabel}>{field === 'from' ? 'From' : 'To'}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${field === 'from' ? 'From' : 'To'} date${value ? `, ${formatFilterDate(value)}` : ''}`}
+        accessibilityHint="Opens a calendar to choose a date"
+        onPress={() => openDatePicker(field)}
+        style={({ pressed }) => [styles.dateRangeButton, pressed && styles.pressed]}
+      >
+        <Text style={[styles.dateRangeValue, !value && styles.pickerPlaceholder]}>
+          {value ? formatFilterDate(value) : 'Any date'}
+        </Text>
+        <Text style={styles.dateRangeIcon}>▦</Text>
+      </Pressable>
+    </View>
+  );
+
+  return (
+    <View style={styles.dateRange}>
+      {renderDateButton('from', from)}
+      {renderDateButton('to', to)}
+      {from || to ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onClear}
+          style={({ pressed }) => [styles.clearDatesButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.clearDatesText}>Clear dates</Text>
+        </Pressable>
+      ) : null}
+      {invalidRange ? (
+        <Text accessibilityLiveRegion="polite" style={styles.dateRangeError}>
+          From date must be on or before To date.
+        </Text>
+      ) : null}
+
+      <Modal
+        animationType="fade"
+        onRequestClose={closeDatePicker}
+        statusBarTranslucent
+        transparent
+        visible={activeField !== null}
+      >
+        <View style={styles.dateModalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close date picker"
+            onPress={closeDatePicker}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            accessibilityViewIsModal
+            style={[styles.dateModalCard, { maxHeight: Math.max(height - 40, 280) }]}
+          >
+            <View style={styles.dateModalHeader}>
+              <Text style={styles.dateModalTitle}>
+                Choose {activeField === 'from' ? 'start' : 'end'} date
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close date picker"
+                onPress={closeDatePicker}
+                hitSlop={8}
+                style={({ pressed }) => [styles.dateModalClose, pressed && styles.pressed]}
+              >
+                <Text style={styles.dateModalCloseText}>×</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.dateModalScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <PortalCalendar
+                month={calendarMonth}
+                selectedDate={draftDate}
+                onSelectDate={(date) => {
+                  setDraftDate(date);
+                  setCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+                }}
+                onChangeMonth={(amount) =>
+                  setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() + amount, 1))
+                }
+                onGoToday={() => {
+                  const today = new Date();
+                  setDraftDate(today);
+                  setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+                }}
+              />
+            </ScrollView>
+            <View style={styles.dateModalActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={closeDatePicker}
+                style={({ pressed }) => [styles.dateModalCancel, pressed && styles.pressed]}
+              >
+                <Text style={styles.dateModalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Apply ${activeField === 'from' ? 'start' : 'end'} date ${toDateKey(draftDate)}`}
+                onPress={applyDate}
+                style={({ pressed }) => [styles.dateModalApply, pressed && styles.pressed]}
+              >
+                <Text style={styles.dateModalApplyText}>Apply date</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function parseDateKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+    ? date
+    : null;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatFilterDate(value: string) {
+  const date = parseDateKey(value);
+  return date
+    ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : value;
+}
+
 export function PortalCalendar({
   month,
   selectedDate,
@@ -154,7 +332,10 @@ export function PortalCalendar({
   onChangeMonth,
   onGoToday,
   markedDates = [],
+  getDayAnnotations,
+  highlightDate,
   fillHeight = false,
+  fullWidth = false,
 }: {
   month: Date;
   selectedDate: Date | null;
@@ -162,7 +343,14 @@ export function PortalCalendar({
   onChangeMonth: (amount: number, clearSelection?: boolean) => void;
   onGoToday: () => void;
   markedDates?: string[];
+  highlightDate?: string;
+  getDayAnnotations?: (date: Date) => {
+    label: string;
+    compactLabel?: string;
+    kind: 'dayType' | 'schedule' | 'holidayLabel' | 'holidayName';
+  }[];
   fillHeight?: boolean;
+  fullWidth?: boolean;
 }) {
   const styles = usePortalStyles();
   const { width } = useWindowDimensions();
@@ -202,7 +390,13 @@ export function PortalCalendar({
   };
 
   return (
-    <View style={[styles.calendarCard, compact && styles.mobileCalendarCard, veryCompact && styles.compactCalendarCard, fillHeight && styles.fillHeightCalendarCard]}>
+    <View style={[
+      styles.calendarCard,
+      fullWidth && styles.fullWidthCalendarCard,
+      compact && styles.mobileCalendarCard,
+      veryCompact && styles.compactCalendarCard,
+      fillHeight && styles.fillHeightCalendarCard,
+    ]}>
       <View style={[styles.calendarHeader, compact && styles.mobileCalendarHeader, veryCompact && styles.compactCalendarHeader]}>
         <Pressable
           accessibilityRole="button"
@@ -265,21 +459,71 @@ export function PortalCalendar({
               selectedDate?.getFullYear() === year &&
               selectedDate.getMonth() === monthIndex &&
               selectedDate.getDate() === day;
-            const marked = markedDates.includes(`${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+            const dayKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const visuallySelected = selected && !highlightDate;
+            const highlighted = highlightDate === dayKey;
+            const marked = markedDates.includes(dayKey);
+            const annotations = getDayAnnotations?.(date) ?? [];
             return (
               <Pressable
                 key={`${year}-${monthIndex}-${day}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${date.toLocaleDateString()}${marked ? ', has sample record' : ''}`}
+                accessibilityLabel={[
+                  date.toLocaleDateString(),
+                  ...annotations.map((annotation) => annotation.label),
+                  marked ? 'has sample record' : '',
+                ].filter(Boolean).join(', ')}
                 accessibilityState={{ selected }}
                 onPress={() => {
                   onSelectDate(date);
                   setView('days');
                 }}
-                style={[styles.dayCell, selected && styles.selectedDay]}
+                style={[
+                  styles.dayCell,
+                  fullWidth && styles.fullWidthDayCell,
+                  compact && fullWidth && styles.mobileFullWidthDayCell,
+                  veryCompact && fullWidth && styles.compactFullWidthDayCell,
+                  visuallySelected && styles.selectedDay,
+                  highlighted && styles.todayHighlightDay,
+                ]}
               >
-                <Text style={[styles.dayText, selected && styles.selectedDayText]}>{day}</Text>
-                {marked ? <View style={[styles.markedDayDot, selected && styles.selectedMarkedDayDot]} /> : null}
+                {fullWidth ? (
+                  <View style={styles.fullWidthDayContent}>
+                    <View style={styles.fullWidthDayHeader}>
+                      <Text style={[styles.dayText, visuallySelected && styles.selectedDayText, highlighted && styles.todayHighlightDayText]}>{day}</Text>
+                      {marked ? (
+                        <View style={[styles.markedDayDot, visuallySelected && styles.selectedMarkedDayDot]} />
+                      ) : null}
+                    </View>
+                    <View style={styles.dayAnnotations}>
+                      {annotations.map((annotation, annotationIndex) => (
+                        <Text
+                          key={`${annotation.kind}-${annotationIndex}`}
+                          numberOfLines={1}
+                          style={[
+                            styles.dayAnnotation,
+                            annotation.kind === 'dayType' && styles.dayTypeAnnotation,
+                            annotation.kind === 'schedule' && styles.scheduleAnnotation,
+                            annotation.kind === 'holidayName' && styles.holidayAnnotation,
+                            annotation.kind === 'holidayLabel' && styles.holidayNameAnnotation,
+                            compact && styles.compactDayAnnotation,
+                            veryCompact && styles.veryCompactDayAnnotation,
+                            highlighted && annotation.kind !== 'holidayName' && styles.todayHighlightAnnotation,
+                            visuallySelected && annotation.kind !== 'holidayName' && styles.selectedDayAnnotation,
+                            visuallySelected && annotation.kind === 'holidayName' && styles.selectedHolidayAnnotation,
+                          ]}
+                        >
+                          {compact && annotation.compactLabel ? annotation.compactLabel : annotation.label}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.dayText, visuallySelected && styles.selectedDayText, highlighted && styles.todayHighlightDayText]}>{day}</Text>
+                    {marked ? <View style={[styles.markedDayDot, visuallySelected && styles.selectedMarkedDayDot]} /> : null}
+                  </>
+                )}
               </Pressable>
             );
           })}
@@ -388,28 +632,61 @@ function usePortalStyles() {
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
-  page: { width: '100%', alignSelf: 'center', padding: 28, paddingBottom: 48 },
-  mobilePage: { padding: 20, paddingBottom: 36 },
-  compactPage: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 26 },
-  heading: { marginBottom: 24, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: RcsColors.border },
-  eyebrow: { color: RcsColors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
-  title: { marginTop: 8, color: RcsColors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.6 },
-  description: { maxWidth: 680, marginTop: 7, color: RcsColors.grayMuted, fontSize: 14, lineHeight: 21 },
+  page: { width: '100%', alignSelf: 'center', padding: 36, paddingBottom: 56 },
+  mobilePage: { padding: 18, paddingBottom: 36 },
+  compactPage: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 28 },
+  heading: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    marginBottom: 26,
+    padding: 24,
+    borderRadius: 22,
+    backgroundColor: RcsColors.yellowLight,
+    borderWidth: 1,
+    borderColor: RcsColors.yellow,
+  },
+  headingAccent: {
+    width: 4,
+    minHeight: 40,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    backgroundColor: RcsColors.yellowDeep,
+  },
+  headingCopy: { flex: 1, minWidth: 0 },
+  eyebrow: { color: RcsColors.yellowDeep, fontSize: 10, fontWeight: '800', letterSpacing: 1.35 },
+  title: { marginTop: 8, color: RcsColors.text, fontSize: 32, fontWeight: '800', letterSpacing: -1 },
+  description: { maxWidth: 680, marginTop: 7, color: RcsColors.grayMuted, fontSize: 14, lineHeight: 22 },
   notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    marginBottom: 18,
-    borderRadius: 3,
-    backgroundColor: RcsColors.yellowLight,
-    borderLeftWidth: 3,
-    borderLeftColor: RcsColors.yellow,
+    marginBottom: 20,
+    borderRadius: 14,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
   },
-  noticeTitle: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
-  noticeText: { marginTop: 5, color: RcsColors.grayDark, fontSize: 12, lineHeight: 18 },
+  noticeAccent: { width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: RcsColors.brown },
+  noticeIcon: {
+    width: 30,
+    height: 30,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: RcsColors.yellowLight,
+  },
+  noticeIconText: { color: RcsColors.brown, fontSize: 14, fontWeight: '800' },
+  noticeCopy: { flex: 1, minWidth: 0 },
+  noticeTitle: { color: RcsColors.brownDark, fontSize: 12, fontWeight: '800' },
+  noticeText: { marginTop: 3, color: RcsColors.grayDark, fontSize: 11, lineHeight: 17 },
   empty: {
     alignItems: 'center',
-    padding: 32,
-    borderRadius: 4,
+    padding: 40,
+    borderRadius: 20,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -419,7 +696,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 3,
+    borderRadius: 13,
     backgroundColor: RcsColors.yellowLight,
   },
   emptyIconText: { color: RcsColors.brown, fontSize: 20, fontWeight: '700' },
@@ -441,7 +718,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 13,
-    borderRadius: 4,
+    borderRadius: 13,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -459,7 +736,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     maxHeight: 280,
     marginTop: 4,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -476,17 +753,63 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   selectedOptionText: { color: RcsColors.brownDark, fontWeight: '700' },
   check: { color: RcsColors.brown, fontWeight: '800' },
   pressed: { opacity: 0.75 },
+  dateRange: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 10 },
+  dateRangeField: { flexGrow: 1, flexBasis: 150, minWidth: 0 },
+  dateRangeButton: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  dateRangeValue: { flex: 1, minWidth: 0, color: RcsColors.text, fontSize: 12 },
+  dateRangeIcon: { color: RcsColors.brown, fontSize: 16 },
+  clearDatesButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
+  clearDatesText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
+  dateRangeError: { flexBasis: '100%', color: RcsColors.danger, fontSize: 12 },
+  dateModalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+  },
+  dateModalCard: {
+    width: '100%',
+    maxWidth: 560,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: RcsColors.background,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  dateModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 },
+  dateModalTitle: { flex: 1, color: RcsColors.text, fontSize: 16, fontWeight: '800' },
+  dateModalClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: RcsColors.surface },
+  dateModalCloseText: { color: RcsColors.brown, fontSize: 24, lineHeight: 28 },
+  dateModalScroll: { flexShrink: 1 },
+  dateModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingTop: 12 },
+  dateModalCancel: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: RcsColors.surface },
+  dateModalCancelText: { color: RcsColors.grayDark, fontSize: 12, fontWeight: '700' },
+  dateModalApply: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: RcsColors.brown },
+  dateModalApplyText: { color: RcsColors.white, fontSize: 12, fontWeight: '700' },
   calendarCard: {
     maxWidth: 850,
-    padding: 22,
-    borderRadius: 4,
+    padding: 24,
+    borderRadius: 20,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
   fillHeightCalendarCard: { flex: 1 },
-  mobileCalendarCard: { padding: 14, borderRadius: 4 },
-  compactCalendarCard: { padding: 9 },
+  fullWidthCalendarCard: { width: '100%', maxWidth: '100%' },
+  mobileCalendarCard: { padding: 14, borderRadius: 16 },
+  compactCalendarCard: { padding: 9, borderRadius: 14 },
   calendarHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   mobileCalendarHeader: { gap: 6, marginBottom: 14 },
   compactCalendarHeader: { gap: 4, marginBottom: 12 },
@@ -495,11 +818,11 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.yellowLight,
   },
   monthButtonText: { color: RcsColors.brown, fontSize: 26, lineHeight: 30 },
-  mobileMonthButton: { width: 40, height: 44, borderRadius: 4 },
+  mobileMonthButton: { width: 40, height: 44, borderRadius: 10 },
   compactMonthButton: { width: 38, height: 44 },
   monthHeading: { flex: 1 },
   headingButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -507,17 +830,48 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   mobileMonthTitle: { fontSize: 14 },
   compactMonthTitle: { fontSize: 12 },
   headingChevron: { color: RcsColors.brownLight, fontSize: 18 },
-  todayButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 4, backgroundColor: RcsColors.grayLight },
+  todayButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 9, backgroundColor: RcsColors.grayLight },
   mobileTodayButton: { minHeight: 44, paddingHorizontal: 8, paddingVertical: 9 },
   compactTodayButton: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 8 },
   todayButtonText: { color: RcsColors.brown, fontSize: 12, fontWeight: '700' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: `${100 / 7}%`, paddingVertical: 10, color: RcsColors.grayMuted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  dayCell: { width: `${100 / 7}%`, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 4 },
-  calendarChoice: { width: '25%', height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 4 },
+  dayCell: { width: `${100 / 7}%`, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  fullWidthDayCell: { height: 88, alignItems: 'stretch', justifyContent: 'flex-start', padding: 8 },
+  mobileFullWidthDayCell: { height: 64 },
+  compactFullWidthDayCell: { height: 54 },
+  fullWidthDayContent: { flex: 1, justifyContent: 'space-between' },
+  fullWidthDayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dayAnnotations: { gap: 2 },
+  dayAnnotation: { overflow: 'hidden', fontSize: 9, lineHeight: 12 },
+  dayTypeAnnotation: { color: RcsColors.grayDark, fontWeight: '700' },
+  scheduleAnnotation: { color: RcsColors.grayMuted, fontSize: 8, lineHeight: 10 },
+  holidayAnnotation: {
+    overflow: 'hidden',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
+    backgroundColor: RcsColors.holidayBackground,
+    color: RcsColors.holidayForeground,
+    fontSize: 8,
+    lineHeight: 11,
+    textAlign: 'center',
+  },
+  holidayNameAnnotation: { color: RcsColors.danger, fontSize: 8, fontWeight: '700' },
+  todayHighlightAnnotation: { color: RcsColors.todayHighlightText },
+  compactDayAnnotation: { fontSize: 7, lineHeight: 9 },
+  veryCompactDayAnnotation: { fontSize: 6, lineHeight: 8 },
+  selectedDayAnnotation: { color: RcsColors.white },
+  selectedHolidayAnnotation: {
+    backgroundColor: RcsColors.holidayBackground,
+    color: RcsColors.holidayForeground,
+  },
+  calendarChoice: { width: '25%', height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   adjacentChoice: { opacity: 0.45 },
   adjacentChoiceText: { color: RcsColors.grayMuted },
   selectedDay: { backgroundColor: RcsColors.brownSurface },
+  todayHighlightDay: { backgroundColor: '#FFF0CA' },
+  todayHighlightDayText: { color: RcsColors.todayHighlightText, fontWeight: '800' },
   dayText: { color: RcsColors.grayDark, fontSize: 13 },
   markedDayDot: { width: 4, height: 4, marginTop: 2, borderRadius: 2, backgroundColor: RcsColors.brownLight },
   selectedMarkedDayDot: { backgroundColor: RcsColors.yellow },

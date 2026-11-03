@@ -4,10 +4,12 @@ import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoLeaveBalances, demoLoans, demoPayslip, demoProfileValues, formatDemoDate } from '@/data/demo-data';
-import { resolveIdentity } from '@/data/employee-records';
+import { resolveIdentity, rcsDemoProfileValues } from '@/data/employee-records';
 import { buildPayslipHtml, payslipFileName } from '@/data/payslip-html';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useMemo, useState } from 'react';
@@ -133,8 +135,9 @@ const payslipKeys = {
 } as const;
 
 export default function InquiryScreen() {
-  const { user } = useAuth();
-  const identity = resolveIdentity(user?.displayName);
+  const { user, profilePicture, hasCustomProfilePicture, profilePictureError, setProfilePicture } = useAuth();
+  const isRcsDemo = user?.company.slug === 'rcs-eastern-intertrade' && user.username === 'demo';
+  const identity = resolveIdentity(user?.displayName, user?.company.slug, user?.username);
   const styles = useInquiryStyles();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
@@ -145,6 +148,38 @@ export default function InquiryScreen() {
 const [payPeriod, setPayPeriod] = useState(payPeriods[0]);
 const selectedPayslip = demoPayslip.find((slip) => slip.payPeriod === payPeriod) ?? demoPayslip[0];
 const [printError, setPrintError] = useState('');
+const [photoError, setPhotoError] = useState('');
+
+const chooseProfilePicture = async () => {
+  setPhotoError('');
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.72,
+      base64: true,
+    });
+    if (result.canceled) return;
+    const image = result.assets[0];
+    const imageData = image?.base64;
+    if (!imageData) throw new Error('The selected image could not be prepared.');
+    await setProfilePicture(`data:${image.mimeType ?? 'image/jpeg'};base64,${imageData}`);
+  } catch (error: unknown) {
+    console.error('Unable to set the profile picture.', error);
+    setPhotoError(error instanceof Error ? error.message : 'Unable to save the profile picture.');
+  }
+};
+
+const removeProfilePicture = async () => {
+  setPhotoError('');
+  try {
+    await setProfilePicture(null);
+  } catch (error: unknown) {
+    console.error('Unable to remove the profile picture.', error);
+    setPhotoError(error instanceof Error ? error.message : 'Unable to remove the profile picture.');
+  }
+};
 
 const printPayslip = async () => {
   setPrintError('');
@@ -194,22 +229,67 @@ const [typeFilter, setTypeFilter] = useState('All');
   return (
     <PortalPage>
       <PageHeading title={page.title} description={page.description} />
-      <PreviewNotice>Fictional demo information for presentation only. Sensitive identifiers are masked; this is not a live employee record.</PreviewNotice>
+      <PreviewNotice>
+        {isRcsDemo
+          ? 'Career details are based on your resume. Contact, address, birth date, identifiers, scores, and compensation use altered synthetic demo values, not encrypted real data.'
+          : 'Fictional demo information for presentation only. Sensitive identifiers are masked; this is not a live employee record.'}
+      </PreviewNotice>
 
       {section === 'basic-profile' ? (
         <View style={[styles.profileCard, width < 600 && styles.mobileCard]}>
-          
+          <View style={styles.profilePictureRow}>
+            <View style={styles.profilePictureFrame}>
+              {profilePicture ? (
+                <Image
+                  source={profilePicture}
+                  contentFit="cover"
+                  style={styles.profilePicture}
+                  accessibilityLabel="Your profile picture"
+                />
+              ) : (
+                <Text style={styles.profilePictureInitials}>
+                  {identity.firstName.charAt(0)}{identity.lastName.charAt(0)}
+                </Text>
+              )}
+            </View>
+            <View style={styles.profilePictureActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={chooseProfilePicture}
+                style={({ pressed }) => [styles.profilePictureButton, pressed && { opacity: 0.75 }]}
+              >
+                <Text style={styles.profilePictureButtonText}>
+                  {profilePicture ? 'Change photo' : 'Add profile picture'}
+                </Text>
+              </Pressable>
+              {hasCustomProfilePicture ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={removeProfilePicture}
+                  style={({ pressed }) => [styles.removeProfilePictureButton, pressed && { opacity: 0.75 }]}
+                >
+                  <Text style={styles.removeProfilePictureText}>Restore default photo</Text>
+                </Pressable>
+              ) : null}
+              <Text style={styles.profilePictureHint}>Saved on this device only.</Text>
+              {photoError || profilePictureError ? (
+                <Text style={styles.photoError}>{photoError || profilePictureError}</Text>
+              ) : null}
+            </View>
+          </View>
           <Text style={styles.cardTitle}>Employee information</Text>
           <View style={[styles.profileGrid, isDesktop && styles.desktopProfileGrid]}>
             {profileFields.map((field) => (
               <View key={field} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
                   <Text style={styles.fieldLabel}>{field}</Text>
-                <Text style={styles.unavailable}>
+                <Text style={styles.fieldValue}>
                   {field === 'Employee name'
                     ? identity.fullName
                   : field === 'Employee code'
                     ? identity.employeeCode
-                  : demoProfileValues[field] ?? 'Sample record'}
+                  : isRcsDemo
+                    ? rcsDemoProfileValues[field] ?? 'DEMO VALUE'
+                    : demoProfileValues[field] ?? 'Sample record'}
                 </Text>
               </View>
             ))}
@@ -271,7 +351,7 @@ const [typeFilter, setTypeFilter] = useState('All');
         {payslipFields.map((field) => (
           <View key={field} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
             <Text style={styles.fieldLabel}>{field}</Text>
-            <Text style={styles.unavailable}>
+            <Text style={styles.fieldValue}>
               {selectedPayslip[payslipKeys[field as keyof typeof payslipKeys]] || '—'}
             </Text>
           </View>
@@ -284,7 +364,7 @@ const [typeFilter, setTypeFilter] = useState('All');
         {selectedPayslip.earnings.map((row) => (
           <View key={row.description} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
             <Text style={styles.fieldLabel}>{row.description}</Text>
-            <Text style={styles.unavailable}>{row.amount}</Text>
+            <Text style={styles.fieldValue}>{row.amount}</Text>
             <Text style={styles.fieldSubtext}>{row.hours} hours</Text>
           </View>
         ))}
@@ -297,7 +377,7 @@ const [typeFilter, setTypeFilter] = useState('All');
         {selectedPayslip.deductions.map((row) => (
           <View key={row.description} style={[styles.profileItem, isDesktop && styles.desktopProfileItem]}>
             <Text style={styles.fieldLabel}>{row.description}</Text>
-            <Text style={styles.unavailable}>{row.amount}</Text>
+            <Text style={styles.fieldValue}>{row.amount}</Text>
             <Text style={styles.fieldSubtext}>Balance: {row.balance}</Text>
           </View>
         ))}
@@ -338,15 +418,48 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   filter: { maxWidth: 380, marginBottom: 18, zIndex: 10, elevation: 10 },
   profileCard: {
     padding: 24,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
   },
+  profilePictureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginBottom: 22,
+  },
+  profilePictureFrame: {
+    width: 84,
+    height: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: 42,
+    backgroundColor: RcsColors.yellowLight,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  profilePicture: { width: '100%', height: '100%' },
+  profilePictureInitials: { color: RcsColors.brown, fontSize: 24, fontWeight: '800' },
+  profilePictureActions: { flex: 1, minWidth: 150, alignItems: 'flex-start', gap: 8 },
+  profilePictureButton: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: RcsColors.brown,
+  },
+  profilePictureButtonText: { color: RcsColors.white, fontSize: 12, fontWeight: '700' },
+  removeProfilePictureButton: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 4 },
+  removeProfilePictureText: { color: RcsColors.danger, fontSize: 12, fontWeight: '700' },
+  profilePictureHint: { color: RcsColors.grayMuted, fontSize: 11 },
+  photoError: { color: RcsColors.danger, fontSize: 12, lineHeight: 17 },
   payrollCard: {
     padding: 24,
     marginBottom: 18,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,
@@ -357,12 +470,12 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   justifyContent: 'center',
   marginBottom: 18,
   paddingHorizontal: 18,
-  borderRadius: 4,
+  borderRadius: 10,
   backgroundColor: RcsColors.brown,
 },
 printButtonText: { color: RcsColors.white, fontSize: 13, fontWeight: '700' },
 printError: { marginTop: -8, marginBottom: 14, color: RcsColors.danger, fontSize: 12 },
-  mobileCard: { padding: 16, borderRadius: 4 },
+  mobileCard: { padding: 16, borderRadius: 12 },
   cardTitle: { marginBottom: 18, color: RcsColors.brownDark, fontSize: 18, fontWeight: '800' },
   profileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   desktopProfileGrid: { gap: 14 },
@@ -371,12 +484,12 @@ printError: { marginTop: -8, marginBottom: 14, color: RcsColors.danger, fontSize
     flexBasis: '100%',
     minWidth: 0,
     padding: 14,
-    borderRadius: 4,
+    borderRadius: 10,
     backgroundColor: RcsColors.background,
   },
   desktopProfileItem: { flexBasis: '45%', minWidth: 200 },
   fieldLabel: { color: RcsColors.grayMuted, fontSize: 11, fontWeight: '700' },
-  unavailable: { marginTop: 7, color: RcsColors.grayMuted, fontSize: 13 },
+  fieldValue: { marginTop: 7, color: RcsColors.text, fontSize: 13, fontWeight: '600' },
   
   tableScroll: { flexGrow: 1 },
 tableContent: { flexGrow: 1, paddingBottom: 3 },
@@ -384,7 +497,7 @@ tableHeading: { flex: 1, minWidth: 125, paddingRight: 8, color: RcsColors.grayDa
 tableCell: { flex: 1, minWidth: 125, paddingRight: 8, color: RcsColors.text, fontSize: 14, lineHeight: 16 },
   tableCard: {
     padding: 16,
-    borderRadius: 4,
+    borderRadius: 12,
     backgroundColor: RcsColors.surface,
     borderWidth: 1,
     borderColor: RcsColors.border,

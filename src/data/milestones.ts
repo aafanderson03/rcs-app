@@ -1,5 +1,4 @@
 const birthdays = [
-  { name: "Mia Santos", day: 2 },
   { name: "Rafael Cruz", day: 4 },
   { name: "Bianca Reyes", day: 6 },
   { name: "Paolo Garcia", day: 8 },

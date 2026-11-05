@@ -8,7 +8,7 @@ import { useAppTheme } from '@/contexts/theme-context';
 
 export function PortalPage({
   children,
-  maxWidth = 1320,
+  maxWidth = 1600,
 }: {
   children: ReactNode;
   maxWidth?: number;
@@ -631,7 +631,7 @@ function usePortalStyles() {
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
-  page: { width: '100%', alignSelf: 'center', paddingVertical: 36, paddingHorizontal: 24, paddingBottom: 56 },
+  page: { width: '100%', alignSelf: 'center', paddingVertical: 36, paddingHorizontal: 12, paddingBottom: 56 },
   mobilePage: { padding: 18, paddingBottom: 36 },
   compactPage: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 28 },
   heading: {

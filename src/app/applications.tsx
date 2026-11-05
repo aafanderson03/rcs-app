@@ -1448,7 +1448,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 24, paddingBottom: 40 },
   mobileContent: { padding: 18, paddingBottom: 32 },
   compactContent: { padding: 14, paddingBottom: 28 },
-  desktopContent: { maxWidth: 1500, paddingVertical: 32, paddingHorizontal: 20, paddingBottom: 44 },
+  desktopContent: { maxWidth: 1600, paddingVertical: 32, paddingHorizontal: 12, paddingBottom: 44 },
   contentColumns: { gap: 18 },
   desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
   startColumn: { gap: 18 },

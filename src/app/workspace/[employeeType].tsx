@@ -112,7 +112,7 @@ function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     content: { width: '100%', padding: 22, paddingBottom: 42 },
-    desktopContent: { alignSelf: 'center', maxWidth: 1440, paddingVertical: 42, paddingHorizontal: 24, paddingBottom: 56 },
+    desktopContent: { alignSelf: 'center', maxWidth: 1600, paddingVertical: 42, paddingHorizontal: 12, paddingBottom: 56 },
     hero: { paddingTop: 15, paddingBottom: 25, marginBottom: 28, borderBottomWidth: 1, borderBottomColor: colors.border },
     eyebrow: { color: colors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
     title: { maxWidth: 640, marginTop: 18, color: colors.text, fontSize: 31, lineHeight: 38, fontWeight: '700', letterSpacing: -0.7 },

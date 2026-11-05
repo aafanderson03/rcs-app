@@ -203,6 +203,33 @@ export default function HomeScreen() {
     },
   ];
 
+  const supportCard = (
+    <View
+      style={[
+        styles.support,
+        isMobile && styles.mobileSupport,
+        isDesktop && styles.desktopSupport,
+      ]}
+    >
+      <View style={[styles.supportCopy, isDesktop && styles.desktopSupportCopy]}>
+        <Text style={styles.supportTitle}>Here when you need us</Text>
+        <Text style={styles.supportDescription}>
+          Find instructions for common requests and employee services.
+        </Text>
+      </View>
+      <View style={styles.supportActions}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/help')}
+          hitSlop={8}
+          style={({ pressed }) => [styles.helpButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.helpButtonText}>Open Help</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <ScrollView
@@ -514,28 +541,11 @@ export default function HomeScreen() {
                 />
               </View>
             </View>
+            {isDesktop ? supportCard : null}
           </View>
         </View>
 
-   
-        <View style={[styles.support, isMobile && styles.mobileSupport]}>
-          <View style={styles.supportCopy}>
-            <Text style={styles.supportTitle}>Here when you need us</Text>
-            <Text style={styles.supportDescription}>
-              Find instructions for common requests and employee services.
-            </Text>
-          </View>
-          <View style={styles.supportActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/help')}
-              hitSlop={8}
-              style={({ pressed }) => [styles.helpButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.helpButtonText}>Open Help</Text>
-            </Pressable>
-          </View>
-        </View>
+        {!isDesktop ? supportCard : null}
 
         <Text style={styles.footer}>Sample information · Not connected to company systems</Text>
       </ScrollView>
@@ -618,7 +628,7 @@ function MilestoneGroup({
 const createStyles = (colors: Record<keyof RcsPalette, string>) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   content: { width: '100%', padding: 20, paddingBottom: 40 },
-  desktopContent: { alignSelf: 'center', maxWidth: 1440, paddingVertical: 40, paddingHorizontal: 24, paddingBottom: 60 },
+  desktopContent: { alignSelf: 'center', maxWidth: 1600, paddingVertical: 40, paddingHorizontal: 12, paddingBottom: 60 },
 
 
   heroWrap: { marginBottom: 20 },
@@ -770,7 +780,7 @@ const createStyles = (colors: Record<keyof RcsPalette, string>) => StyleSheet.cr
   cardActionArrow: { marginLeft: 7, color: colors.brown, fontSize: 15 },
 
   milestoneTitle: { marginBottom: 6, color: colors.text, fontSize: 13, fontWeight: '700' },
-  milestoneRow: { height: 40, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  milestoneRow: { height: 40, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6 },
   avatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.yellowLight, borderWidth: 1, borderColor: colors.border },
   avatarText: { color: colors.brown, fontSize: 10, fontWeight: '800' },
   milestoneName: { flex: 1, minWidth: 0, color: colors.text, fontSize: 12, fontWeight: '600' },
@@ -834,6 +844,8 @@ const createStyles = (colors: Record<keyof RcsPalette, string>) => StyleSheet.cr
     borderWidth: 1,
     borderColor: colors.border,
   },
+  desktopSupport: { marginTop: 16, padding: 16 },
+  desktopSupportCopy: { minWidth: 0 },
   mobileSupport: { flexWrap: 'wrap', alignItems: 'flex-start' },
   supportCopy: { flex: 1, minWidth: 210, gap: 4 },
   supportTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },

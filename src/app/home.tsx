@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 
 import { PortalCalendar } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 import { useAppTheme } from '@/contexts/theme-context';
@@ -64,8 +64,7 @@ function initials(name: string) {
 export default function HomeScreen() {
   const { user, profilePicture } = useAuth();
   const { applications } = useDemoSubmissions();
-  const { colorScheme } = useAppTheme();
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
+  const { palette: colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -616,10 +615,10 @@ function MilestoneGroup({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
+const createStyles = (colors: Record<keyof RcsPalette, string>) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   content: { width: '100%', padding: 20, paddingBottom: 40 },
-  desktopContent: { alignSelf: 'center', maxWidth: 1320, padding: 40, paddingBottom: 60 },
+  desktopContent: { alignSelf: 'center', maxWidth: 1440, paddingVertical: 40, paddingHorizontal: 24, paddingBottom: 60 },
 
 
   heroWrap: { marginBottom: 20 },

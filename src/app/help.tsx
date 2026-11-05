@@ -6,7 +6,7 @@ import { applicationGuide, ApplicationGuideContent } from '@/components/applicat
 import { ExternalLink } from '@/components/external-link';
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 
 type FaqListItem = { text: string; details?: string[] };
@@ -258,8 +258,7 @@ function resourcePreview(content: string, query: string) {
 }
 
 export default function HelpScreen() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const { width, height } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;

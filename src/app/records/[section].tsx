@@ -4,7 +4,7 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoRecordValues } from '@/data/demo-data';
@@ -39,8 +39,7 @@ const sectionTitles: Record<string, string> = {
 
 export default function EmployeeRecordScreen() {
   const { user } = useAuth();
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const { width } = useWindowDimensions();
   const { section } = useLocalSearchParams<{ section: string }>();

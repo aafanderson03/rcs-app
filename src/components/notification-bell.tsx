@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Path, Svg } from 'react-native-svg';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoAnnouncements, formatDemoDate, relativeDate } from '@/data/demo-data';
@@ -16,7 +17,7 @@ type Notice = { id: string; title: string; detail: string; date: string; route: 
 function useNotifications() {
   const router = useRouter();
   const { applications } = useDemoSubmissions();
-  const { colorScheme } = useAppTheme();
+  const { palette } = useAppTheme();
   const [seen, setSeen] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -87,13 +88,13 @@ function useNotifications() {
     if (next.length !== seen.length) persistSeen(next);
   };
 
-  return { notices, unreadIds, markRead, markAllRead, router, colorScheme };
+  return { notices, unreadIds, markRead, markAllRead, router, palette };
 }
 
 export function NotificationBell() {
-  const { notices, unreadIds, markRead, markAllRead, router, colorScheme } = useNotifications();
+  const { notices, unreadIds, markRead, markAllRead, router, palette } = useNotifications();
   const { width } = useWindowDimensions();
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
+  const colors = palette;
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -109,10 +110,15 @@ export function NotificationBell() {
         onPress={() => (open ? close() : setOpen(true))}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >
-        <Image 
-          source={require('../../assets/images/bell.png')} 
-          style={styles.bellImage} 
-        />
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"
+            stroke={colors.brownDark}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
         {unreadIds.length ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{unreadIds.length > 9 ? '9+' : unreadIds.length}</Text>
@@ -170,7 +176,7 @@ export function NotificationBell() {
   );
 }
 
-const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
+const createStyles = (colors: Record<keyof RcsPalette, string>) => StyleSheet.create({
   wrap: { alignItems: 'flex-end' },
   button: {
     width: 50,
@@ -182,11 +188,6 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     borderWidth: 1,
     borderColor: colors.border,
   },
-  bellImage: { 
-    width: 20, 
-    height: 20,
-    resizeMode: 'contain',
-   },
   badge: {
     position: 'absolute',
     top: -2,

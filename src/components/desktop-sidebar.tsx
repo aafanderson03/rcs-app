@@ -2,10 +2,11 @@ import { Image } from 'expo-image';
 import { usePathname, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
-import { getPaletteForScheme } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 
@@ -30,13 +31,25 @@ type Route =
 export type MenuLink = {
   label: string;
   route?: Route;
-  icon?: string;
+  icon?: SidebarIconName;
 };
 
 type MenuGroup = {
   label: string;
   links: MenuLink[];
 };
+
+type SidebarIconName =
+  | 'home'
+  | 'announcement'
+  | 'clock'
+  | 'file'
+  | 'wallet'
+  | 'person'
+  | 'folder'
+  | 'help'
+  | 'external-link'
+  | 'sign-out';
 
 type DesktopSidebarProps = {
   onNavigate?: () => void;
@@ -57,8 +70,8 @@ const workspaceLinks: MenuLink[] = [
 ];
 
 const supportLinks: MenuLink[] = [
-  { label: 'Help', route: '/help', icon: '?' },
-  { label: 'Other URLs', route: '/portal', icon: '↗' },
+  { label: 'Help', route: '/help', icon: 'help' },
+  { label: 'Other URLs', route: '/portal', icon: 'external-link' },
 ];
 
 const menuGroups: MenuGroup[] = [
@@ -119,16 +132,16 @@ const menuGroups: MenuGroup[] = [
   },
 ];
 
-const primaryIcons: Record<string, string> = {
-  Home: '⌂',
-  Announcements: '◉',
-  'Attendance & DTR': '◷',
-  Applications: '▤',
-  'Pay & benefits': '₱',
-  'Profile & employment': '◎',
-  'Additional records': '⋯',
-  Help: '?',
-  'Sign out': '⇥',
+const primaryIcons: Record<string, SidebarIconName> = {
+  Home: 'home',
+  Announcements: 'announcement',
+  'Attendance & DTR': 'clock',
+  Applications: 'file',
+  'Pay & benefits': 'wallet',
+  'Profile & employment': 'person',
+  'Additional records': 'folder',
+  Help: 'help',
+  'Sign out': 'sign-out',
 };
 
 export function DesktopSidebar({
@@ -141,11 +154,11 @@ export function DesktopSidebar({
   logo,
   onToggleCollapsed,
 }: DesktopSidebarProps) {
-  const { colorScheme } = useAppTheme();
+  const { palette } = useAppTheme();
   const { signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
 
   const activeGroupLabel =
     pathname === '/inquiry/basic-profile'
@@ -163,6 +176,7 @@ export function DesktopSidebar({
 
   const renderLink = (item: MenuLink, compact = false, iconOnly = false) => {
     const route = item.route;
+    const icon = item.icon ?? primaryIcons[item.label] ?? 'file';
     const active =
       typeof route === 'string'
         ? route === pathname
@@ -192,9 +206,7 @@ export function DesktopSidebar({
       >
         {compact ? (
           <View style={[styles.primaryIcon, active && styles.activePrimaryIcon]}>
-            <Text style={[styles.primaryIconText, active && styles.activeLinkText]}>
-              {item.icon ?? primaryIcons[item.label] ?? '•'}
-            </Text>
+            <SidebarIcon name={icon} color={active ? palette.white : palette.grayMuted} />
           </View>
         ) : null}
         {!iconOnly ? <Text
@@ -226,17 +238,22 @@ export function DesktopSidebar({
           ]}
         >
           {logo ? (
-            <Image
-              source={logo}
-              contentFit="contain"
-              style={[styles.railLogo, collapsed && styles.collapsedRailLogo]}
-              accessibilityLabel={`${companyName} logo`}
-            />
+            <View style={[styles.railLogoFrame, collapsed && styles.collapsedRailLogoFrame]}>
+              <Image
+                source={logo}
+                contentFit="contain"
+                style={styles.railLogo}
+                accessibilityLabel={`${companyName} logo`}
+              />
+            </View>
           ) : null}
-          {collapsed ? <Text style={styles.railCollapseIcon}>›</Text> : null}
+          {collapsed ? <Text style={[styles.railCollapseIcon, styles.collapsedRailCollapseIcon]}>›</Text> : null}
           {!collapsed ? (
             <>
-              <Text style={styles.railBrandName} numberOfLines={1}>{companyName}</Text>
+              <View style={styles.railBrandCopy}>
+                <Text style={styles.railBrandName} numberOfLines={2}>{companyName}</Text>
+                <Text style={styles.railBrandCaption} numberOfLines={1}>EMPLOYEE PORTAL</Text>
+              </View>
               <Text style={styles.railCollapseIcon}>‹</Text>
             </>
           ) : null}
@@ -268,11 +285,19 @@ export function DesktopSidebar({
                       pressed && styles.pressedLink,
                     ]}
                   >
-                    <Text style={styles.primaryIconText}>{primaryIcons[group.label]}</Text>
+                    <SidebarIcon
+                      name={primaryIcons[group.label]}
+                      color={activeGroupLabel === group.label ? palette.brown : palette.grayMuted}
+                    />
                   </Pressable>
                 ) : (
                   <>
                     <View style={styles.groupHeading}>
+                      <SidebarIcon
+                        name={primaryIcons[group.label]}
+                        color={activeGroupLabel === group.label ? palette.brown : palette.grayMuted}
+                        size={16}
+                      />
                       <Text
                         style={[
                           styles.groupLabel,
@@ -309,9 +334,9 @@ export function DesktopSidebar({
                   pressed && styles.pressedLink,
                 ]}
               >
-                <Text style={collapsed ? styles.primaryIconText : styles.railSupportIcon}>
-                  {link.icon}
-                </Text>
+                <View style={collapsed ? undefined : styles.railSupportIcon}>
+                  <SidebarIcon name={link.icon ?? 'help'} color={palette.brown} size={16} />
+                </View>
                 {!collapsed ? <Text style={styles.railSupportText}>{link.label}</Text> : null}
               </Pressable>
             );
@@ -331,9 +356,16 @@ export function DesktopSidebar({
               pressed && styles.pressedLink,
             ]}
           >
-            <Text style={collapsed ? styles.primaryIconText : styles.railSignOutText}>
-              {collapsed ? primaryIcons['Sign out'] : 'Sign out'}
-            </Text>
+            {collapsed ? (
+              <SidebarIcon name={primaryIcons['Sign out']} color={palette.grayMuted} />
+            ) : (
+              <>
+                <View style={styles.railSupportIcon}>
+                  <SidebarIcon name={primaryIcons['Sign out']} color={palette.brown} size={16} />
+                </View>
+                <Text style={styles.railSignOutText}>Sign out</Text>
+              </>
+            )}
           </Pressable>
         </View>
       </View>
@@ -363,15 +395,25 @@ export function DesktopSidebar({
         {menuGroups.map((group) => {
           return (
             <View key={group.label} style={styles.group}>
-              <Text
+              <View
                 style={[
-                  styles.groupLabel,
                   styles.groupHeading,
-                  activeGroupLabel === group.label && styles.activeGroupLabel,
                 ]}
               >
-                {group.label}
-              </Text>
+                <SidebarIcon
+                  name={primaryIcons[group.label]}
+                  color={activeGroupLabel === group.label ? palette.brown : palette.grayMuted}
+                  size={16}
+                />
+                <Text
+                  style={[
+                    styles.groupLabel,
+                    activeGroupLabel === group.label && styles.activeGroupLabel,
+                  ]}
+                >
+                  {group.label}
+                </Text>
+              </View>
               <View style={styles.groupItems}>
                 {group.links.map((link) =>
                   renderLink({
@@ -407,6 +449,7 @@ export function DesktopSidebar({
             pressed && styles.pressedLink,
           ]}
         >
+          <SidebarIcon name={primaryIcons['Sign out']} color={palette.brown} size={16} />
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
       </View>
@@ -426,7 +469,42 @@ function withRecordRoute(link: MenuLink): MenuLink & { route: Route } {
   };
 }
 
-function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
+const sidebarIconPaths: Record<SidebarIconName, string> = {
+  home: 'M3 10.5 12 3l9 7.5M5 9v11h14V9M9 20v-6h6v6',
+  announcement: 'M4 10v4h3l8 4V6l-8 4H4zM7 14l1.5 5h3L10 15M19 9a4 4 0 0 1 0 6',
+  clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  file: 'M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6',
+  wallet: 'M4 6.5h15a2 2 0 0 1 2 2v10H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2h13v3M21 12h-5a2 2 0 0 0 0 4h5M16 14h.01',
+  person: 'M20 21a8 8 0 0 0-16 0M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  folder: 'M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3zM3 9h18',
+  help: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.5 9a2.5 2.5 0 1 1 4.1 1.9c-.9.8-1.6 1.1-1.6 2.6M12 17h.01',
+  'external-link': 'M14 4h6v6M20 4l-9 9M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',
+  'sign-out': 'M10 17l5-5-5-5M15 12H3M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7',
+};
+
+function SidebarIcon({
+  name,
+  color,
+  size = 18,
+}: {
+  name: SidebarIconName;
+  color: string;
+  size?: number;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d={sidebarIconPaths[name]}
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   sidebar: {
     width: 272,
@@ -439,19 +517,33 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
   collapsedDesktopRail: { width: 72 },
   fullScreenSidebar: { width: '100%', maxWidth: '100%', borderRightWidth: 0 },
   railBrand: {
-    minHeight: 86,
+    minHeight: 92,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  collapsedRailBrand: { justifyContent: 'center', gap: 2, paddingHorizontal: 10 },
-  railLogo: { width: 72, height: 54, flexShrink: 0 },
-  collapsedRailLogo: { width: 48, height: 36 },
-  railBrandName: { flex: 1, minWidth: 0, color: colors.brown, fontSize: 12, fontWeight: '800' },
+  collapsedRailBrand: { minHeight: 76, justifyContent: 'center', gap: 0, paddingHorizontal: 10 },
+  railLogoFrame: {
+    width: 64,
+    height: 58,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+    borderRadius: 13,
+    backgroundColor: colors.yellowLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  collapsedRailLogoFrame: { width: 48, height: 48, padding: 3 },
+  railLogo: { width: '100%', height: '100%' },
+  railBrandCopy: { flex: 1, minWidth: 0, gap: 4 },
+  railBrandName: { color: colors.text, fontSize: 11, lineHeight: 14, fontWeight: '800' },
+  railBrandCaption: { color: colors.brown, fontSize: 8, lineHeight: 11, fontWeight: '800', letterSpacing: 0.8 },
   railCollapseIcon: {
     width: 28,
     height: 28,
@@ -461,6 +553,17 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     textAlign: 'center',
     borderRadius: 9,
     backgroundColor: colors.grayLight,
+  },
+  collapsedRailCollapseIcon: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 20,
+    height: 20,
+    fontSize: 15,
+    lineHeight: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   collapsedMenuContent: { alignItems: 'center' },
   railIconLink: {
@@ -499,7 +602,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     paddingHorizontal: 12,
     borderRadius: 9,
   },
-  railSupportIcon: { width: 24, color: colors.brown, fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  railSupportIcon: { width: 24, alignItems: 'center' },
   railSupportText: { flex: 1, minWidth: 0, color: colors.grayDark, fontSize: 12, fontWeight: '700' },
   railSignOut: {
     minHeight: 40,
@@ -546,19 +649,22 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
   },
   primaryLinkText: { flex: 1, color: colors.grayDark, fontSize: 12, fontWeight: '600' },
   primaryIcon: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 9,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  primaryIconText: { color: colors.grayMuted, fontSize: 16, fontWeight: '700' },
-  activePrimaryIcon: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  activePrimaryIcon: { backgroundColor: 'rgba(255,255,255,0.16)', borderColor: 'rgba(255,255,255,0.2)' },
   group: { marginBottom: 4 },
   groupHeading: {
     minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 10,
     borderRadius: 9,
   },
@@ -612,7 +718,7 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  signOutButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: colors.grayLight },
+  signOutButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 11, backgroundColor: colors.grayLight },
   signOutText: { color: colors.brown, fontSize: 11, fontWeight: '800' },
   });
 }

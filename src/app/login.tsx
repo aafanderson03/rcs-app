@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
-import { getPaletteForScheme } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { isStandaloneDemoMode, useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { DEMO_PASSWORD, demoCompanies } from '@/data/demo-accounts';
@@ -14,12 +14,11 @@ import { DEMO_PASSWORD, demoCompanies } from '@/data/demo-accounts';
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
-  const { colorScheme } = useAppTheme();
-  const { width } = useWindowDimensions();
+  const { palette: colors } = useAppTheme();
+  const { height, width } = useWindowDimensions();
   const isDesktop = width >= 800;
   const isMobile = width < 600;
   const isCompact = width < 380;
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +37,37 @@ export default function LoginScreen() {
     setMessage('');
     setAccountMenuOpen(false);
   };
+
+  const renderDemoCompanies = () => demoCompanies.map((company) => {
+    const companyLogo = getCompanyBranding(company.slug, company.name);
+    return (
+      <View key={company.slug} style={styles.demoCompany}>
+        <View style={styles.demoCompanyHeader}>
+          <View style={styles.demoLogoFrame}>
+            <Image source={companyLogo.logo} contentFit="contain" style={styles.demoLogo} accessibilityLabel={`${company.name} logo`} />
+          </View>
+          <Text style={styles.demoCompanyName}>{company.name}</Text>
+        </View>
+        {company.accounts.map((account) => (
+          <Pressable
+            key={account.username}
+            accessibilityRole="button"
+            accessibilityLabel={`Select ${account.label} account`}
+            accessibilityState={{ selected: username === account.username }}
+            onPress={() => chooseDemoAccount(account.username)}
+            style={({ pressed }) => [
+              styles.demoRoleLink,
+              username === account.username && styles.demoAccountSelected,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.demoRoleLabel}>{account.label}</Text>
+            <Text style={styles.demoAccountUsername}>{account.displayName} · {account.username}</Text>
+          </Pressable>
+        ))}
+      </View>
+    );
+  });
 
   const submit = async () => {
     if (!username.trim() || !password) {
@@ -162,7 +192,7 @@ export default function LoginScreen() {
                   </View>
                   <Text style={styles.accountDropdownChevron}>{accountMenuOpen ? '⌃' : '⌄'}</Text>
                 </Pressable>
-                {accountMenuOpen ? (
+                {accountMenuOpen && desktopWeb ? (
                   <ScrollView
                     accessibilityLabel="Company and account type options"
                     style={styles.accountDropdownMenu}
@@ -171,36 +201,7 @@ export default function LoginScreen() {
                     nestedScrollEnabled
                     showsVerticalScrollIndicator
                   >
-                    {demoCompanies.map((company) => {
-                      const companyLogo = getCompanyBranding(company.slug, company.name);
-                      return (
-                        <View key={company.slug} style={styles.demoCompany}>
-                          <View style={styles.demoCompanyHeader}>
-                            <View style={styles.demoLogoFrame}>
-                              <Image source={companyLogo.logo} contentFit="contain" style={styles.demoLogo} accessibilityLabel={`${company.name} logo`} />
-                            </View>
-                            <Text style={styles.demoCompanyName}>{company.name}</Text>
-                          </View>
-                          {company.accounts.map((account) => (
-                            <Pressable
-                              key={account.username}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Select ${account.label} account`}
-                              accessibilityState={{ selected: username === account.username }}
-                              onPress={() => chooseDemoAccount(account.username)}
-                              style={({ pressed }) => [
-                                styles.demoRoleLink,
-                                username === account.username && styles.demoAccountSelected,
-                                pressed && styles.pressed,
-                              ]}
-                            >
-                              <Text style={styles.demoRoleLabel}>{account.label}</Text>
-                              <Text style={styles.demoAccountUsername}>{account.displayName} · {account.username}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      );
-                    })}
+                    {renderDemoCompanies()}
                   </ScrollView>
                 ) : null}
               </View>
@@ -234,11 +235,52 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
+      <Modal
+        visible={accountMenuOpen && !desktopWeb}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccountMenuOpen(false)}
+      >
+        <View style={styles.accountModalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close company and account options"
+            onPress={() => setAccountMenuOpen(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            accessibilityViewIsModal
+            style={[styles.accountModalCard, { height: Math.min(560, Math.max(height - 48, 240)) }]}
+          >
+            <View style={styles.accountModalHeader}>
+              <Text style={styles.accountModalTitle}>Choose a company and account</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close company and account options"
+                onPress={() => setAccountMenuOpen(false)}
+                style={({ pressed }) => [styles.accountModalClose, pressed && styles.pressed]}
+              >
+                <Text style={styles.accountModalCloseText}>×</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              accessibilityLabel="Company and account type options"
+              style={styles.accountModalScroll}
+              contentContainerStyle={styles.accountDropdownMenuContent}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
+              {renderDemoCompanies()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
+function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     page: { flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: colors.background },
@@ -285,6 +327,13 @@ function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
     accountDropdownAnchorOpen: { zIndex: 20, elevation: 10 },
     accountDropdownMenu: { position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: 250, marginTop: 6, borderRadius: 9, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, elevation: 20, zIndex: 30 },
     accountDropdownMenuContent: { paddingHorizontal: 8, paddingVertical: 3 },
+    accountModalBackdrop: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(20, 18, 15, 0.55)' },
+    accountModalCard: { width: '100%', maxWidth: 440, alignSelf: 'center', padding: 14, borderRadius: 16, backgroundColor: colors.surface },
+    accountModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
+    accountModalTitle: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '800' },
+    accountModalClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.background },
+    accountModalCloseText: { color: colors.brown, fontSize: 24, lineHeight: 28 },
+    accountModalScroll: { flex: 1, minHeight: 0 },
     demoCompany: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },
     demoCompanyHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     demoLogoFrame: { width: 42, height: 36, alignItems: 'center', justifyContent: 'center', padding: 3, borderRadius: 7, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },

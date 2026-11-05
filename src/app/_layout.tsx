@@ -2,10 +2,11 @@ import { DesktopSidebar } from '@/components/desktop-sidebar';
 import { NotificationBell } from '@/components/notification-bell';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
-import { getPaletteForScheme } from '@/constants/theme';
+import { COLOR_THEMES, type ColorTheme, type RcsPalette } from '@/constants/theme';
 import { AuthProvider, useAuth, type ProfilePictureSource } from '@/contexts/auth-context';
 import { DemoSubmissionsProvider } from '@/contexts/demo-submissions-context';
 import { AppThemeProvider, useAppTheme, type ThemeMode } from '@/contexts/theme-context';
+import { version as appVersion } from '../../package.json';
 import {
   Montserrat_400Regular,
   Montserrat_500Medium,
@@ -20,7 +21,7 @@ import { DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Modal, Platform, Pressable, StyleSheet, useWindowDimensions, View, ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const SPLASH_HOLD_DURATION_MS = 3250;
@@ -53,7 +54,7 @@ export default function RootLayout() {
 }
 
 function RootLayoutContent() {
-  const { colorScheme, mode, setMode, storageError } = useAppTheme();
+  const { colorScheme, mode, setMode, colorTheme, setColorTheme, palette: colors, storageError } = useAppTheme();
   const { user, profilePicture } = useAuth();
   const companyBranding = getCompanyBranding(user?.company.slug, user?.company.name);
   const [fontsLoaded, fontError] = useFonts({
@@ -63,12 +64,12 @@ function RootLayoutContent() {
     Montserrat_700Bold,
     Montserrat_800ExtraBold,
   });
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [colorThemePickerOpen, setColorThemePickerOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashProgress] = useState(() => new Animated.Value(0));
@@ -157,21 +158,27 @@ function RootLayoutContent() {
                 displayName={user?.displayName ?? ''}
                 employeeType={user?.employeeType ?? 'employee'}
                 profilePicture={profilePicture}
-                onToggleTheme={() => setMode(mode === 'light' ? 'dark' : 'light')}
+                colorTheme={colorTheme}
+                onOpenColorThemes={() => setColorThemePickerOpen(true)}
               />
             ) : null}
-            {!isPublicPage && !isDesktop ? <View style={styles.topBar}>
+            {!isPublicPage && !isDesktop ? <View style={[styles.topBar, width < 380 && styles.compactTopBar]}>
               <View style={styles.brandGroup}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Go to home"
+                  accessibilityLabel={`Go to home for ${companyBranding.name}`}
+                  accessibilityHint="Opens the employee portal home page"
                   onPress={() => {
                     setMenuOpen(false);
                     router.replace('/home');
                   }}
-                  style={({ pressed }) => [styles.brand, pressed && styles.brandPressed]}
+                  style={({ pressed }) => [
+                    styles.brand,
+                    width < 380 && styles.compactBrand,
+                    pressed && styles.brandPressed,
+                  ]}
                 >
-                  <View style={styles.mobileBrandLogoFrame}>
+                  <View style={[styles.mobileBrandLogoFrame, width < 380 && styles.compactBrandLogoFrame]}>
                     <Image
                       source={companyBranding.logo}
                       contentFit="contain"
@@ -179,7 +186,9 @@ function RootLayoutContent() {
                       accessibilityLabel={`${companyBranding.name} home`}
                     />
                   </View>
-                  <Text style={styles.mobileBrandName} numberOfLines={1}>{companyBranding.name}</Text>
+                  <Text style={[styles.mobileBrandName, width < 380 && styles.compactBrandName]}>
+                    {companyBranding.name}
+                  </Text>
                 </Pressable>
               </View>
               <Pressable
@@ -209,11 +218,12 @@ function RootLayoutContent() {
                 <NotificationBell />
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Switch to ${themeModeLabel(mode === 'light' ? 'dark' : 'light')} theme`}
-                  accessibilityHint="Switches between Light and Dark themes"
-                  onPress={() => setMode(mode === 'light' ? 'dark' : 'light')}
+                  accessibilityLabel="Theme settings"
+                  accessibilityHint={`${getColorThemeLabel(colorTheme)}, ${themeModeLabel(mode)} mode`}
+                  onPress={() => setColorThemePickerOpen(true)}
                   style={({ pressed }) => [styles.themeButton, pressed && styles.menuButtonPressed]}
                 >
+                  <View style={[styles.colorThemeSwatch, { backgroundColor: COLOR_THEMES.find((themeOption) => themeOption.id === colorTheme)?.primary }]} />
                   <Text style={styles.themeButtonText}>{mode === 'light' ? '☾' : '☀'}</Text>
                 </Pressable>
               </View>
@@ -294,6 +304,17 @@ function RootLayoutContent() {
               />
             </View>
           ) : null}
+          {!isPublicPage ? (
+            <ColorThemePicker
+              visible={colorThemePickerOpen}
+              selectedTheme={colorTheme}
+              mode={mode}
+              onSelect={setColorTheme}
+              onModeChange={setMode}
+              onClose={() => setColorThemePickerOpen(false)}
+              colors={colors}
+            />
+          ) : null}
           {splashVisible ? (
             <Animated.View
               accessible
@@ -342,31 +363,136 @@ function themeModeLabel(mode: ThemeMode) {
   return mode === 'light' ? 'Light' : 'Dark';
 }
 
+function getColorThemeLabel(theme: ColorTheme) {
+  return COLOR_THEMES.find((option) => option.id === theme)?.label ?? 'RCS Classic';
+}
+
+function ColorThemePicker({
+  visible,
+  selectedTheme,
+  mode,
+  onSelect,
+  onModeChange,
+  onClose,
+  colors,
+}: {
+  visible: boolean;
+  selectedTheme: ColorTheme;
+  mode: ThemeMode;
+  onSelect: (theme: ColorTheme) => void;
+  onModeChange: (mode: ThemeMode) => void;
+  onClose: () => void;
+  colors: Record<keyof RcsPalette, string>;
+}) {
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.colorThemeBackdrop}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close color theme selector"
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View accessibilityViewIsModal style={styles.colorThemeModal}>
+          <View style={styles.colorThemeHeading}>
+            <View style={styles.colorThemeHeadingCopy}>
+              <Text style={styles.colorThemeTitle}>Theme settings</Text>
+              <Text style={styles.colorThemeDescription}>Choose an accent color and light or dark mode. Your choices are saved on this device.</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close color theme selector"
+              onPress={onClose}
+              style={({ pressed }) => [styles.colorThemeClose, pressed && styles.menuButtonPressed]}
+            >
+              <Text style={styles.colorThemeCloseText}>×</Text>
+            </Pressable>
+          </View>
+          <View accessibilityRole="radiogroup" accessibilityLabel="Appearance mode" style={styles.themeModeSwitch}>
+            {(['light', 'dark'] as const).map((option) => {
+              const selected = option === mode;
+              return (
+                <Pressable
+                  key={option}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => onModeChange(option)}
+                  style={({ pressed }) => [
+                    styles.themeModeOption,
+                    selected && styles.themeModeOptionSelected,
+                    pressed && styles.menuButtonPressed,
+                  ]}
+                >
+                  <Text style={[styles.themeModeOptionText, selected && styles.themeModeOptionTextSelected]}>
+                    {themeModeLabel(option)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <ScrollView style={styles.colorThemeOptions} contentContainerStyle={styles.colorThemeOptionList}>
+            {COLOR_THEMES.map((option) => {
+              const selected = option.id === selectedTheme;
+              return (
+                <Pressable
+                  key={option.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => onSelect(option.id)}
+                  style={({ pressed }) => [
+                    styles.colorThemeOption,
+                    selected && styles.colorThemeOptionSelected,
+                    pressed && styles.menuButtonPressed,
+                  ]}
+                >
+                  <View style={styles.colorThemeSwatches}>
+                    <View style={[styles.colorThemeOptionSwatch, { backgroundColor: option.primary }]} />
+                    <View style={[styles.colorThemeOptionSwatch, styles.colorThemeSecondarySwatch, { backgroundColor: option.secondary }]} />
+                  </View>
+                  <Text style={styles.colorThemeOptionLabel}>{option.label}</Text>
+                  {selected ? <Text style={styles.colorThemeCheck}>✓</Text> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function DesktopHeader({
   mode,
   displayName,
   employeeType,
   profilePicture,
-  onToggleTheme,
+  colorTheme,
+  onOpenColorThemes,
 }: {
   mode: ThemeMode;
   displayName: string;
   employeeType: string;
   profilePicture: ProfilePictureSource | null;
-  onToggleTheme: () => void;
+  colorTheme: ColorTheme;
+  onOpenColorThemes: () => void;
 }) {
-  const { colorScheme } = useAppTheme();
+  const { palette } = useAppTheme();
   const router = useRouter();
-  const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const initials = getInitials(displayName);
   const employeeLabel = employeeType.replace(/([a-z])([A-Z])/g, '$1 $2');
 
   return (
     <LinearGradient
-      colors={['#F9DF8A', '#D6A52F']}
+      colors={mode === 'dark' ? [palette.surface, palette.surface] : [palette.yellowLight, palette.yellow]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={styles.desktopHeader}
+      style={[
+        styles.desktopHeader,
+        mode === 'dark' && { borderBottomColor: palette.border },
+      ]}
       accessibilityLabel="Page controls"
     >
       <View style={styles.desktopHeaderStart}>
@@ -402,13 +528,14 @@ function DesktopHeader({
         <NotificationBell />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Switch to ${themeModeLabel(mode === 'light' ? 'dark' : 'light')} theme`}
-          accessibilityHint="Switches between Light and Dark themes"
-          onPress={onToggleTheme}
+          accessibilityLabel="Theme settings"
+          accessibilityHint={`${getColorThemeLabel(colorTheme)}, ${themeModeLabel(mode)} mode`}
+          onPress={onOpenColorThemes}
           style={({ pressed }) => [styles.desktopThemeButton, pressed && styles.menuButtonPressed]}
         >
+          <View style={[styles.colorThemeSwatch, { backgroundColor: COLOR_THEMES.find((option) => option.id === colorTheme)?.primary }]} />
           <Text style={styles.desktopThemeIcon}>{mode === 'light' ? '☾' : '☀'}</Text>
-          <Text style={styles.desktopThemeLabel}>{themeModeLabel(mode)}</Text>
+          <Text style={styles.desktopThemeLabel}>Theme</Text>
         </Pressable>
       </View>
     </LinearGradient>
@@ -426,17 +553,23 @@ function getInitials(displayName: string) {
 }
 
 function DesktopFooter({ companyName }: { companyName: string }) {
-  const { colorScheme } = useAppTheme();
-  const styles = useMemo(() => createStyles(getPaletteForScheme(colorScheme)), [colorScheme]);
+  const { palette } = useAppTheme();
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  const currentDate = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date());
+
   return (
     <View style={styles.desktopFooter}>
       <Text style={styles.desktopFooterText}>© {new Date().getFullYear()} {companyName}</Text>
-      <Text style={styles.desktopFooterText}>Employee Self-Service Portal</Text>
+      <Text style={styles.desktopFooterText}>v{appVersion} · {currentDate} · Employee Self-Service Portal</Text>
     </View>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSheet.create({
+const createStyles = (colors: Record<keyof RcsPalette, string>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   desktopRoot: { flexDirection: 'row', alignItems: 'stretch' },
   workspaceBody: { flex: 1, minHeight: 0, minWidth: 0 },
@@ -477,8 +610,8 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   desktopProfileImage: { width: '100%', height: '100%' },
   desktopProfileInitials: { color: colors.brown, fontSize: 12, fontWeight: '800' },
   desktopProfileCopy: { maxWidth: 150, gap: 2 },
-  desktopProfileName: { color: '#292725', fontSize: 12, fontWeight: '800' },
-  desktopProfileRole: { color: '#51422A', fontSize: 10, textTransform: 'capitalize' },
+  desktopProfileName: { color: colors.text, fontSize: 12, fontWeight: '800' },
+  desktopProfileRole: { color: colors.mutedText, fontSize: 10, textTransform: 'capitalize' },
   desktopThemeButton: {
     minHeight: 42,
     flexDirection: 'row',
@@ -510,18 +643,20 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    paddingHorizontal: 20,
+    gap: 8,
+    paddingHorizontal: 12,
     backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     zIndex: 2,
   },
-  brandGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
+  compactTopBar: { minHeight: 72, paddingHorizontal: 8, gap: 4 },
+  brandGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   brand: { minHeight: 68, flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
+  compactBrand: { minHeight: 64 },
   mobileBrandLogoFrame: {
-    width: 68,
-    height: 54,
+    width: 60,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 3,
@@ -530,8 +665,10 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
     borderWidth: 1,
     borderColor: colors.border,
   },
+  compactBrandLogoFrame: { width: 48, height: 42, flexShrink: 0 },
   brandLogo: { width: '100%', height: '100%' },
-  mobileBrandName: { flexShrink: 1, minWidth: 0, marginLeft: 10, color: colors.text, fontSize: 13, fontWeight: '800' },
+  mobileBrandName: { flex: 1, flexShrink: 1, minWidth: 0, marginLeft: 8, color: colors.text, fontSize: 13, fontWeight: '800' },
+  compactBrandName: { marginLeft: 6, fontSize: 11 },
   brandPressed: { opacity: 0.75 },
   mobileProfileButton: {
     width: 44,
@@ -562,19 +699,79 @@ const createStyles = (colors: ReturnType<typeof getPaletteForScheme>) => StyleSh
   menuButtonPressed: { opacity: 0.7 },
   hamburger: { width: 19, gap: 4 },
   hamburgerLine: { height: 2, borderRadius: 2, backgroundColor: colors.brownDark },
-  themeControl: { flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 4 },
+  themeControl: { flexDirection: 'row', alignItems: 'center', gap: 5, zIndex: 4 },
+  colorThemeSwatch: { width: 17, height: 17, borderRadius: 9, borderWidth: 2, borderColor: colors.surface },
   themeButton: {
-    minWidth: 44,
+    minWidth: 50,
     height: 44,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 5,
     borderRadius: 14,
     backgroundColor: colors.grayLight,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   themeButtonText: { color: colors.brownDark, fontSize: 14, fontWeight: '700' },
+  colorThemeBackdrop: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(20, 18, 15, 0.55)' },
+  colorThemeModal: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '85%',
+    alignSelf: 'center',
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  colorThemeHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  colorThemeHeadingCopy: { flex: 1, gap: 4 },
+  colorThemeTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  colorThemeDescription: { color: colors.grayMuted, fontSize: 11, lineHeight: 16 },
+  colorThemeClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: colors.grayLight },
+  colorThemeCloseText: { color: colors.brown, fontSize: 24, lineHeight: 28 },
+  colorThemeOptions: { flexShrink: 1 },
+  colorThemeOptionList: { gap: 8, paddingVertical: 4 },
+  colorThemeOption: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  colorThemeOptionSelected: { backgroundColor: colors.yellowLight, borderColor: colors.brown },
+  themeModeSwitch: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 10,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  themeModeOption: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  themeModeOptionSelected: { backgroundColor: colors.yellowLight },
+  themeModeOptionText: { color: colors.mutedText, fontSize: 13, fontWeight: '700' },
+  themeModeOptionTextSelected: { color: colors.brown, fontWeight: '800' },
+  colorThemeSwatches: { width: 42, flexDirection: 'row', alignItems: 'center' },
+  colorThemeOptionSwatch: { width: 22, height: 22, borderWidth: 2, borderColor: colors.surface, borderRadius: 12 },
+  colorThemeSecondarySwatch: { width: 18, height: 18, marginLeft: -5 },
+  colorThemeOptionLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: '700' },
+  colorThemeCheck: { color: colors.brown, fontSize: 16, fontWeight: '800' },
   storageErrorBanner: {
     paddingHorizontal: 16,
     paddingVertical: 8,

@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 
 const companyLinks = [
@@ -15,8 +15,7 @@ const companyLinks = [
 ];
 
 export default function OtherUrlsScreen() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [query, setQuery] = useState('');
   const router = useRouter();

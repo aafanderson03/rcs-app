@@ -1,6 +1,6 @@
 import { ChoicePicker, EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoLeaveBalances, demoLoans, demoPayslip, demoProfileValues, formatDemoDate } from '@/data/demo-data';
@@ -435,8 +435,7 @@ function BalanceCards({ kind, rows, wide = false }: { kind: 'leave' | 'loan'; ro
 }
 
 function useInquiryStyles() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   return useMemo(() => createStyles(palette), [palette]);
 }
 

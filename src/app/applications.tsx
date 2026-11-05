@@ -12,10 +12,13 @@ import {
   PreviewNotice,
 } from '@/components/portal-ui';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 import { useAppTheme } from '@/contexts/theme-context';
 import { formatDemoDate, relativeDate, type DemoApplication, type DemoApprover } from '@/data/demo-data';
+
+const SELECT_OPTION = 'Select Option';
+const ALL_TRANSACTION_TYPES = 'All transaction types';
 
 const transactionTypes = [
   'Attendance',
@@ -28,7 +31,7 @@ const transactionTypes = [
   'Rest Day',
   'Workshift',
 ];
-const typeFilters = ['All transaction types', ...transactionTypes];
+const typeFilters = [ALL_TRANSACTION_TYPES, ...transactionTypes];
 const statusFilters = ['All statuses', 'Pending', 'Approved', 'Disapproved', 'Cancelled'];
 
 type RequestField = {
@@ -359,7 +362,7 @@ const requestForms: Record<string, RequestSection[]> = {
 };
 
 export default function ApplicationsScreen() {
-  const { colorScheme, palette, styles, statusColors } = useApplicationStyles();
+  const { palette, styles, statusColors } = useApplicationStyles();
   const { applications, cancelDemoApplication, submitDemoApplication } = useDemoSubmissions();
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;
@@ -367,7 +370,7 @@ export default function ApplicationsScreen() {
   const [selectedTransaction, setSelectedTransaction] = useState('');
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [openPagePicker, setOpenPagePicker] = useState<string | null>(null);
-  const [transactionFilter, setTransactionFilter] = useState(typeFilters[0]);
+  const [transactionFilter, setTransactionFilter] = useState(ALL_TRANSACTION_TYPES);
   const [statusFilter, setStatusFilter] = useState(statusFilters[0]);
   const [notice, setNotice] = useState('');
   const [view, setView] = useState<'list' | 'calendar'>('list');
@@ -384,7 +387,8 @@ export default function ApplicationsScreen() {
 
   const invalidDateRange = Boolean(from && to && from > to);
   const baseApplications = invalidDateRange ? [] : applications.filter((item) =>
-    (transactionFilter === 'All transaction types' || item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile'))) &&
+    (transactionFilter === ALL_TRANSACTION_TYPES ||
+      item.type.toLowerCase().includes(transactionFilter.toLowerCase().replace('profile update', 'profile'))) &&
     (!from || item.submittedAt >= from) &&
     (!to || item.submittedAt <= to)
   );
@@ -430,7 +434,7 @@ export default function ApplicationsScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: getPaletteForScheme(colorScheme).background }]}
+      style={[styles.safeArea, { backgroundColor: palette.background }]}
       edges={['bottom']}
     >
       <ScrollView
@@ -463,12 +467,12 @@ export default function ApplicationsScreen() {
                 <OptionPicker
                   label="Transaction type"
                   value={selectedTransaction}
-                  placeholder="Select a transaction"
-                  options={transactionTypes}
+                  placeholder={SELECT_OPTION}
+                  options={[SELECT_OPTION, ...transactionTypes]}
                   open={openPagePicker === 'start-transaction'}
                   onOpenChange={(open) => setOpenPagePicker(open ? 'start-transaction' : null)}
                   onChange={(value) => {
-                    setSelectedTransaction(value);
+                    setSelectedTransaction(value === SELECT_OPTION ? '' : value);
                     setNotice('');
                   }}
                 />
@@ -854,9 +858,10 @@ function RequestForm({
         ).flat()
       : section.fields;
   const allFields = sections.flatMap(fieldsForSection);
-  const missingFields = allFields
-    .filter((field) => field.required && !values[field.key]?.trim())
-    .map((field) => field.label);
+  const fieldErrors = getRequestFieldErrors(allFields, values);
+  const requiredFields = allFields.filter((field) => field.required);
+  const completedRequiredFields = requiredFields.filter((field) => !fieldErrors[field.key]).length;
+  const validationErrorCount = Object.keys(fieldErrors).length;
 
   const updateValue = (key: string, value: string) => {
     setValues((current) => ({ ...current, [key]: value }));
@@ -864,7 +869,7 @@ function RequestForm({
 
   const reviewRequest = () => {
     setShowErrors(true);
-    if (missingFields.length > 0) {
+    if (validationErrorCount > 0) {
       setReviewing(false);
       return;
     }
@@ -873,7 +878,7 @@ function RequestForm({
 
   const submitRequest = () => {
     setShowErrors(true);
-    if (missingFields.length > 0) {
+    if (validationErrorCount > 0) {
       setReviewing(false);
       return;
     }
@@ -893,9 +898,42 @@ function RequestForm({
         Fictional demo only. Submitting adds a sample request to this device&apos;s local history; no live employee system is contacted.
       </PreviewNotice>
 
+      <View
+        style={styles.formProgress}
+        accessibilityLabel={`Step ${reviewing ? 2 : 1} of 2. ${completedRequiredFields} of ${requiredFields.length} required fields complete.`}
+      >
+        <View style={styles.formProgressHeader}>
+          <Text style={styles.formProgressStep}>Step {reviewing ? 2 : 1} of 2 · {reviewing ? 'Review & submit' : 'Request details'}</Text>
+          <Text style={styles.formProgressCount}>
+            {reviewing
+              ? 'Details ready to review'
+              : `${completedRequiredFields} of ${requiredFields.length} required fields complete`}
+          </Text>
+        </View>
+        <View style={styles.formProgressTrack}>
+          <View
+            style={[
+              styles.formProgressFill,
+              {
+                width: `${reviewing ? 100 : requiredFields.length ? (completedRequiredFields / requiredFields.length) * 50 : 50}%`,
+              },
+            ]}
+          />
+        </View>
+        <Text style={styles.formProgressHint}>
+          {reviewing
+            ? 'Confirm the information below. Choose Edit details to make changes.'
+            : 'Fields marked * are required. Dates must be in order; numeric amounts must be zero or more.'}
+        </Text>
+      </View>
+
       <Pressable
         accessibilityRole="button"
-        onPress={() => setValues(Object.fromEntries(allFields.map((field) => [field.key, sampleFieldValue(field)])))}
+        onPress={() => {
+          setValues(Object.fromEntries(allFields.map((field) => [field.key, sampleFieldValue(field)])));
+          setShowErrors(false);
+          setReviewing(false);
+        }}
         style={({ pressed }) => [styles.fillSampleButton, pressed && styles.pressed]}
       >
         <Text style={styles.fillSampleButtonText}>Fill with sample data</Text>
@@ -916,22 +954,39 @@ function RequestForm({
           <View style={[styles.formGrid, isDesktop && styles.desktopFormGrid]}>
             {fieldsForSection(section).map((field) => {
               const value = values[field.key] ?? '';
-              const hasError = showErrors && field.required && !value.trim();
+              const error = showErrors ? fieldErrors[field.key] : undefined;
+              const hasError = Boolean(error);
 
               if (field.type === 'checkbox') {
                 return (
-                  <Pressable
+                  <View
                     key={field.key}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: value === 'true' }}
-                    onPress={() => updateValue(field.key, value === 'true' ? '' : 'true')}
-                    style={[styles.checkField, isDesktop && styles.desktopFormField]}
+                    style={[
+                      styles.checkFieldContainer,
+                      isDesktop && styles.desktopFormField,
+                      hasError && styles.formFieldError,
+                    ]}
                   >
-                    <View style={[styles.checkbox, value === 'true' && styles.checkboxChecked]}>
-                      {value === 'true' ? <Text style={styles.checkboxMark}>✓</Text> : null}
-                    </View>
-                    <Text style={styles.formLabel}>{field.label}</Text>
-                  </Pressable>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={field.label}
+                      accessibilityState={{ checked: value === 'true' }}
+                      accessibilityHint={error}
+                      onPress={() => updateValue(field.key, value === 'true' ? '' : 'true')}
+                      style={styles.checkField}
+                    >
+                      <View style={[styles.checkbox, value === 'true' && styles.checkboxChecked]}>
+                        {value === 'true' ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                      </View>
+                      <Text style={styles.formLabel}>
+                        {field.label}
+                        {field.required ? <Text style={styles.requiredMark}> *</Text> : null}
+                      </Text>
+                    </Pressable>
+                    {hasError ? (
+                      <Text style={styles.fieldError} accessibilityLiveRegion="polite">{error}</Text>
+                    ) : null}
+                  </View>
                 );
               }
 
@@ -963,19 +1018,23 @@ function RequestForm({
                       label={field.label}
                       value={value}
                       open={openPickerField === field.key}
-                      placeholder={field.placeholder ?? `Enter ${field.label.toLowerCase()}`}
+                      placeholder={SELECT_OPTION}
                       options={field.options ?? []}
-                      onChange={(selected) => updateValue(field.key, selected)}
+                      onChange={(selected) =>
+                        updateValue(field.key, selected === SELECT_OPTION ? '' : selected)
+                      }
                       onOpenChange={(isOpen) => setOpenPickerField(isOpen ? field.key : null)}
                     />
                   ) : field.type === 'select' && field.options ? (
                     <ChoicePicker
                       label=""
                       value={value}
-                      placeholder="Select an option"
-                      options={field.options}
+                      placeholder={SELECT_OPTION}
+                      options={[SELECT_OPTION, ...(field.options ?? []).filter((option) => option !== SELECT_OPTION)]}
                       open={openPickerField === field.key}
-                      onChange={(selected) => updateValue(field.key, selected)}
+                      onChange={(selected) =>
+                        updateValue(field.key, selected === SELECT_OPTION ? '' : selected)
+                      }
                       onOpenChange={(isOpen) => setOpenPickerField(isOpen ? field.key : null)}
                     />
                   ) : (
@@ -985,6 +1044,7 @@ function RequestForm({
                       onChangeText={(text) => updateValue(field.key, text)}
                       placeholder={field.placeholder ?? placeholderFor(field)}
                       placeholderTextColor={palette.grayMuted}
+                      accessibilityHint={error}
                       keyboardType={
                         field.type === 'number'
                           ? 'decimal-pad'
@@ -1000,7 +1060,9 @@ function RequestForm({
                       ]}
                     />
                   )}
-                  {hasError ? <Text style={styles.fieldError}>This field is required.</Text> : null}
+                  {hasError ? (
+                    <Text style={styles.fieldError} accessibilityLiveRegion="polite">{error}</Text>
+                  ) : null}
                 </View>
               );
             })}
@@ -1037,16 +1099,23 @@ function RequestForm({
       ) : null}
 
       <View style={[styles.formActions, width < 380 && styles.compactFormActions]}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            setReviewing(false);
-            onBack();
-          }}
-          style={({ pressed }) => [styles.secondaryFormButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.secondaryFormButtonText}>Cancel</Text>
-        </Pressable>
+        {reviewing ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setReviewing(false)}
+            style={({ pressed }) => [styles.secondaryFormButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.secondaryFormButtonText}>Edit details</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onBack}
+            style={({ pressed }) => [styles.secondaryFormButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.secondaryFormButtonText}>Cancel</Text>
+          </Pressable>
+        )}
         <Pressable
           accessibilityRole="button"
           onPress={reviewing ? submitRequest : reviewRequest}
@@ -1056,9 +1125,9 @@ function RequestForm({
           <Text style={styles.continueArrow}>›</Text>
         </Pressable>
       </View>
-      {showErrors && missingFields.length > 0 ? (
-        <Text style={styles.formValidationMessage}>
-          Complete required fields: {missingFields.join(', ')}.
+      {showErrors && validationErrorCount > 0 ? (
+        <Text style={styles.formValidationMessage} accessibilityLiveRegion="polite">
+          Fix {validationErrorCount} highlighted {validationErrorCount === 1 ? 'field' : 'fields'} above before continuing.
         </Text>
       ) : null}
     </PortalPage>
@@ -1152,8 +1221,8 @@ function RequestComboPicker({
   );
   const visibleOptions =
     value.trim() && !options.some((option) => option.toLowerCase() === value.trim().toLowerCase())
-      ? [`Use “${value.trim()}”`, ...matchingOptions]
-      : matchingOptions;
+      ? [SELECT_OPTION, `Use “${value.trim()}”`, ...matchingOptions.filter((option) => option !== SELECT_OPTION)]
+      : [SELECT_OPTION, ...matchingOptions.filter((option) => option !== SELECT_OPTION)];
   const setPickerOpen = (isOpen: boolean) => {
     onOpenChange(isOpen);
   };
@@ -1194,7 +1263,7 @@ function RequestComboPicker({
                   key={option}
                   accessibilityRole="button"
                   onPress={() => {
-                    onChange(selected);
+                    onChange(selected === SELECT_OPTION ? '' : selected);
                     setPickerOpen(false);
                   }}
                   style={({ pressed }) => [styles.option, pressed && styles.pressed]}
@@ -1222,6 +1291,51 @@ function parseRequestDate(value: string) {
   return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day
     ? date
     : null;
+}
+
+function getRequestFieldErrors(fields: RequestField[], values: Record<string, string>) {
+  const errors: Record<string, string> = {};
+
+  fields.forEach((field) => {
+    const value = values[field.key]?.trim() ?? '';
+    const isSelectField = field.type === 'select' || field.type === 'combo';
+    if (field.required && (!value || (isSelectField && value === SELECT_OPTION))) {
+      errors[field.key] = 'This field is required.';
+      return;
+    }
+    if (isSelectField && value === SELECT_OPTION) return;
+    if (!value) return;
+
+    if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      errors[field.key] = 'Enter a valid email address.';
+    } else if (field.type === 'number' && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+      errors[field.key] = 'Enter a number that is zero or more.';
+    } else if (field.type === 'date' && !parseRequestDate(value)) {
+      errors[field.key] = 'Choose a valid date.';
+    }
+  });
+
+  const dateRangePairs = [
+    ['dateFrom', 'dateTo'],
+    ['dateIn', 'dateOut'],
+    ['from', 'to'],
+  ];
+  dateRangePairs.forEach(([startBase, endBase]) => {
+    fields
+      .filter((field) => field.key.replace(/-\d+$/, '') === endBase)
+      .forEach((endField) => {
+        const suffix = endField.key.match(/-\d+$/)?.[0] ?? '';
+        const startValue = values[`${startBase}${suffix}`]?.trim() ?? '';
+        const endValue = values[endField.key]?.trim() ?? '';
+        const startDate = parseRequestDate(startValue);
+        const endDate = parseRequestDate(endValue);
+        if (startDate && endDate && startDate > endDate) {
+          errors[endField.key] = 'End date must be on or after the start date.';
+        }
+      });
+  });
+
+  return errors;
 }
 
 function placeholderFor(field: RequestField) {
@@ -1314,8 +1428,7 @@ function OptionPicker({
 }
 
 function useApplicationStyles() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const statusColors: Record<string, string> = useMemo(
     () => ({
@@ -1326,7 +1439,7 @@ function useApplicationStyles() {
     }),
     [palette]
   );
-  return { colorScheme, palette, styles, statusColors };
+  return { palette, styles, statusColors };
 }
 
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
@@ -1335,7 +1448,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   content: { width: '100%', maxWidth: 1180, alignSelf: 'center', padding: 24, paddingBottom: 40 },
   mobileContent: { padding: 18, paddingBottom: 32 },
   compactContent: { padding: 14, paddingBottom: 28 },
-  desktopContent: { maxWidth: 1500, padding: 32, paddingBottom: 44 },
+  desktopContent: { maxWidth: 1500, paddingVertical: 32, paddingHorizontal: 20, paddingBottom: 44 },
   contentColumns: { gap: 18 },
   desktopContentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
   startColumn: { gap: 18 },
@@ -1540,6 +1653,21 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   pressed: { opacity: 0.75 },
   formBackButton: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingRight: 12, marginBottom: 16 },
   formBackText: { color: RcsColors.brownLight, fontSize: 14, fontWeight: '700' },
+  formProgress: {
+    gap: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: RcsColors.surface,
+    borderWidth: 1,
+    borderColor: RcsColors.border,
+  },
+  formProgressHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 4 },
+  formProgressStep: { color: RcsColors.brownDark, fontSize: 13, fontWeight: '800' },
+  formProgressCount: { color: RcsColors.grayMuted, fontSize: 11 },
+  formProgressTrack: { height: 7, overflow: 'hidden', borderRadius: 4, backgroundColor: RcsColors.grayLight },
+  formProgressFill: { height: '100%', borderRadius: 4, backgroundColor: RcsColors.brown },
+  formProgressHint: { color: RcsColors.grayMuted, fontSize: 11, lineHeight: 16 },
   formSection: {
     padding: 22,
     marginBottom: 16,
@@ -1568,6 +1696,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   desktopFormField: { flexGrow: 1, flexBasis: '48%', minWidth: 230 },
   selectFormField: { zIndex: 10, elevation: 10 },
   openPickerFormField: { zIndex: 50, elevation: 50 },
+  checkFieldContainer: { gap: 4 },
   datePickerContainer: { position: 'relative', zIndex: 1 },
   datePickerButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   datePickerText: { color: RcsColors.grayDark, fontSize: 13 },
@@ -1625,7 +1754,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
     fontSize: 13,
   },
   textAreaInput: { minHeight: 96, textAlignVertical: 'top' },
-  formFieldError: { borderColor: RcsColors.danger },
+  formFieldError: { borderLeftWidth: 3, borderLeftColor: RcsColors.danger, paddingLeft: 8 },
   fieldError: { color: RcsColors.danger, fontSize: 11 },
   checkField: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: {

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { useAppTheme } from '@/contexts/theme-context';
 
@@ -624,15 +624,14 @@ export function PortalCalendar({
 }
 
 function usePortalStyles() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   return useMemo(() => createStyles(palette), [palette]);
 }
 
 function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: RcsColors.background },
-  page: { width: '100%', alignSelf: 'center', padding: 36, paddingBottom: 56 },
+  page: { width: '100%', alignSelf: 'center', paddingVertical: 36, paddingHorizontal: 24, paddingBottom: 56 },
   mobilePage: { padding: 18, paddingBottom: 36 },
   compactPage: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 28 },
   heading: {

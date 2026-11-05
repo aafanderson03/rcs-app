@@ -2,14 +2,13 @@ import { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 
 const PORTAL_URL = 'http://161.49.223.6/RCS_ONLINE';
 
 export default function PortalScreen() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [openError, setOpenError] = useState<string | null>(null);
 

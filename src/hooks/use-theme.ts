@@ -1,7 +1,12 @@
-import { Colors } from "@/constants/theme";
 import { useAppTheme } from "@/contexts/theme-context";
 
 export function useTheme() {
-  const { colorScheme } = useAppTheme();
-  return Colors[colorScheme];
+  const { palette } = useAppTheme();
+  return {
+    text: palette.text,
+    background: palette.background,
+    backgroundElement: palette.grayLight,
+    backgroundSelected: palette.yellowLight,
+    textSecondary: palette.mutedText,
+  };
 }

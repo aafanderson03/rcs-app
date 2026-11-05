@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 
 export const applicationGuide = [
@@ -144,8 +144,7 @@ export const applicationGuide = [
 ];
 
 export function ApplicationGuideContent({ searchQuery = '' }: { searchQuery?: string }) {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const normalizedQuery = searchQuery.trim().toLowerCase();

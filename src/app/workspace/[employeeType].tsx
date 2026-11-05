@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { getCompanyBranding } from '@/constants/company-branding';
-import { getPaletteForScheme } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAuth, type EmployeeType } from '@/contexts/auth-context';
 import { useAppTheme } from '@/contexts/theme-context';
 
@@ -52,8 +52,7 @@ export default function EmployeeWorkspaceScreen() {
   const router = useRouter();
   const { employeeType: routeType } = useLocalSearchParams<{ employeeType: string }>();
   const { user } = useAuth();
-  const { colorScheme } = useAppTheme();
-  const colors = useMemo(() => getPaletteForScheme(colorScheme), [colorScheme]);
+  const { palette: colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const desktop = Platform.OS === 'web' && width >= 760;
@@ -109,11 +108,11 @@ export default function EmployeeWorkspaceScreen() {
   );
 }
 
-function createStyles(colors: ReturnType<typeof getPaletteForScheme>) {
+function createStyles(colors: Record<keyof RcsPalette, string>) {
   return StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     content: { width: '100%', padding: 22, paddingBottom: 42 },
-    desktopContent: { alignSelf: 'center', maxWidth: 1320, padding: 42, paddingBottom: 56 },
+    desktopContent: { alignSelf: 'center', maxWidth: 1440, paddingVertical: 42, paddingHorizontal: 24, paddingBottom: 56 },
     hero: { paddingTop: 15, paddingBottom: 25, marginBottom: 28, borderBottomWidth: 1, borderBottomColor: colors.border },
     eyebrow: { color: colors.brown, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 },
     title: { maxWidth: 640, marginTop: 18, color: colors.text, fontSize: 31, lineHeight: 38, fontWeight: '700', letterSpacing: -0.7 },

@@ -3,7 +3,7 @@ import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ChoicePicker, DateRangeFilter, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useDemoSubmissions } from '@/contexts/demo-submissions-context';
 import { useAppTheme } from '@/contexts/theme-context';
 
@@ -179,8 +179,7 @@ function categoryMatches(category: string, type: string) {
 }
 
 function useDashboardStyles() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
 
   

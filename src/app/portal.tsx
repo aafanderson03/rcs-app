@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { ResponsiveText as Text } from '@/components/responsive-text';
 import { useAppTheme } from '@/contexts/theme-context';
 
@@ -11,8 +11,7 @@ const PORTAL_URL = 'http://161.49.223.6/RCS_ONLINE';
 const PORTAL_ORIGIN = 'http://161.49.223.6';
 
 export default function PortalScreen() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

@@ -33,13 +33,12 @@ one item at a time; keep later items queued until the current item is verified.
 - [ ] **9. Keep the legacy portal prototype-only until HTTPS is available** —
   Continue to restrict the HTTP endpoint to test use; require HTTPS before any
   real employee credentials or broader release.
-- [ ] **10. Improve the compact mobile header** — The company name is truncated
-  to one line beside the logo, profile photo, notifications, and theme control.
-  Keep the full company identity accessible while reducing visual clipping on
-  narrow phones.
-- [ ] **11. Clarify long application forms** — Add progress/context and
-  field-level validation feedback so users can understand required information
-  and correct errors before submitting.
+- [x] **10. Improve the compact mobile header** — Let the company name wrap on
+  narrow phones and expose the full company identity in the accessible home
+  control label.
+- [x] **11. Clarify long application forms** — Show request-detail/review
+  progress and required-field completion; provide field-level required,
+  format, and date-order validation before submission.
 
 ## Audit notes
 
@@ -48,8 +47,9 @@ one item at a time; keep later items queued until the current item is verified.
 - **Home and Dashboard:** Home is useful but information-dense. Dashboard and
   the standalone Other URLs destination are intentionally omitted from the
   sidebar; the legacy portal is listed as Other URLs under Support, after Help.
-- **Applications:** Strong end-to-end request, tracker, and history flow. Long
-  forms could benefit from clearer progress and validation feedback.
+- **Applications:** Request forms show a two-step details/review indicator,
+  required-field completion, actionable field errors, and an editable review
+  step before local demo submission.
 - **Attendance:** Home and DTR now default to today's sample attendance, showing
   only punches reached by the current time and lateness relative to the sample
   shift. Both surfaces explicitly label the data as fictional. The full-width
@@ -91,11 +91,12 @@ distinction explicit until live employee systems are connected.
 - **Live-data states:** No employee-system data source is connected yet. Add
   loading, error, empty, and last-updated states when the live integration is
   introduced; continue labeling current sample content as fictional.
-- **Mobile header:** The company name currently uses a single truncated line
-  alongside the logo and account controls. Preserve access to the full name
-  while refining the layout at narrow phone widths.
-- **Applications:** Long request forms can be easier to complete with explicit
-  progress/context and field-level validation feedback before submission.
+- **Mobile header:** Company names wrap beside the logo on narrow phones, while
+  the home control exposes the complete company identity to assistive
+  technology. Item 10 is complete.
+- **Applications:** Item 11 is complete. Forms show the current step and
+  required-field completion; validation identifies missing/invalid values and
+  reversed date ranges before review or submission.
 - **Leave and loan balances:** Item 6 is complete. Narrow screens now show
   balance cards with remaining/owed amounts and supporting details; web uses
   the same card design and arranges cards in two columns on wide screens.

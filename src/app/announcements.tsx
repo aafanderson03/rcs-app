@@ -3,7 +3,7 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions
 
 import { EmptyState, PageHeading, PortalPage, PreviewNotice } from '@/components/portal-ui';
 import { ResponsiveText as Text, ResponsiveTextInput as TextInput } from '@/components/responsive-text';
-import { getPaletteForScheme, type RcsPalette } from '@/constants/theme';
+import type { RcsPalette } from '@/constants/theme';
 import { useAppTheme } from '@/contexts/theme-context';
 import { demoAnnouncements, formatDemoDate } from '@/data/demo-data';
 
@@ -18,8 +18,7 @@ function daysAgo(value: string) {
 }
 
 export default function AnnouncementsScreen() {
-  const { colorScheme } = useAppTheme();
-  const palette = getPaletteForScheme(colorScheme);
+  const { palette } = useAppTheme();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const { width, height } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 960;

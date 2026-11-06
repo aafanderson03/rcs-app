@@ -1,9 +1,7 @@
 import {
   DAILY_RATE,
   HOURS_PER_DAY,
-  WORK_DAYS_PER_MONTH,
-  amountForCutoff,
-  pagIbigEmployeeShare,
+  PAGIBIG_EMPLOYEE_CONTRIBUTION,
   philHealthEmployeeShare,
   round2,
   sssEmployeeShare,
@@ -491,7 +489,7 @@ export function getDemoCurrentDayAttendance(
 export function getDemoAttendanceForPayroll(
   date: Date,
 ): DemoAttendanceRecord | null {
-  return buildDemoAttendance(date);
+  return buildDemoAttendance(date, true);
 }
 
 export function getDemoMonthlyLateSummary(date: Date): DemoMonthlyLateSummary {
@@ -875,6 +873,35 @@ const formatMoney = (value: number) =>
     maximumFractionDigits: 2,
   });
 
+const actualPayrollOverrides: Record<
+  string,
+  {
+    daysWorked: number;
+    basicPay: number;
+    tardinessDeduction?: number;
+    sssDeduction: number;
+    philHealthDeduction?: number;
+    pagIbigDeduction?: number;
+    position?: string;
+  }
+> = {
+  "2026-10-01": {
+    daysWorked: 12,
+    basicPay: 9000,
+    tardinessDeduction: 1.57,
+    sssDeduction: 450,
+    philHealthDeduction: 487.5,
+    pagIbigDeduction: 200,
+    position: "PROGRAMMER",
+  },
+  "2026-10-16": {
+    daysWorked: 14,
+    basicPay: 10500,
+    sssDeduction: 525,
+    position: "PROGRAMMER",
+  },
+};
+
 function adjustForWeekend(date: Date) {
   const day = date.getDay();
   if (day === 6) date.setDate(date.getDate() - 1);
@@ -882,14 +909,94 @@ function adjustForWeekend(date: Date) {
   return date;
 }
 
-function buildDemoPayslips(count: number): DemoPayslip[] {
-  const monthlyBasic = DAILY_RATE * WORK_DAYS_PER_MONTH;
-  const monthly = {
-    sss: sssEmployeeShare(monthlyBasic),
-    philHealth: philHealthEmployeeShare(monthlyBasic),
-    pagIbig: pagIbigEmployeeShare(monthlyBasic),
-  };
+function getScheduledWorkdays(start: Date, end: Date) {
+  let workdays = 0;
+  for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+    if (!isRestDay(day)) workdays += 1;
+  }
+  return workdays;
+}
 
+function getDemoPayrollTotals(start: Date, end: Date) {
+  const actualPayroll = actualPayrollOverrides[dateKey(start)];
+  let daysWorked = 0;
+  const scheduledWorkdays = actualPayroll
+    ? actualPayroll.daysWorked
+    : getScheduledWorkdays(start, end);
+  let silDays = 0;
+  let lwopDays = 0;
+  let lateMinutes = 0;
+
+  if (!actualPayroll) {
+    for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+      if (isRestDay(day)) continue;
+      const record = getDemoAttendanceForPayroll(new Date(day));
+      if (!record) continue;
+      if (record.status === "LWOP") {
+        lwopDays += 1;
+        continue;
+      }
+      if (record.status === "SIL") {
+        silDays += 1;
+        continue;
+      }
+      daysWorked += 1;
+      lateMinutes += record.totalLateMinutes;
+    }
+  } else {
+    daysWorked = actualPayroll.daysWorked;
+  }
+
+  const basicDays = scheduledWorkdays - silDays;
+  const regularHours = basicDays * HOURS_PER_DAY;
+  const basicPay =
+    actualPayroll?.basicPay ??
+    round2(regularHours * (DAILY_RATE / HOURS_PER_DAY));
+  const silPay = round2(silDays * DAILY_RATE);
+  const lwopPay = -round2(lwopDays * DAILY_RATE);
+  const paidDays = daysWorked + silDays;
+  const tardiness =
+    actualPayroll?.tardinessDeduction !== undefined
+      ? -actualPayroll.tardinessDeduction
+      : -tardinessDeduction(lateMinutes);
+  const tardinessHours =
+    actualPayroll?.tardinessDeduction !== undefined
+      ? actualPayroll.tardinessDeduction / (DAILY_RATE / HOURS_PER_DAY)
+      : lateMinutes / 60;
+
+  return {
+    daysWorked,
+    silDays,
+    lwopDays,
+    lateMinutes,
+    basicDays,
+    regularHours,
+    basicPay,
+    silPay,
+    lwopPay,
+    paidDays,
+    tardiness,
+    tardinessHours,
+    totalEarnings: round2(basicPay + silPay + lwopPay + tardiness),
+  };
+}
+
+function getDemoMonthlyPayrollTotals(year: number, month: number) {
+  const firstCutoff = getDemoPayrollTotals(
+    new Date(year, month, 1),
+    new Date(year, month, 15),
+  );
+  const secondCutoff = getDemoPayrollTotals(
+    new Date(year, month, 16),
+    new Date(year, month + 1, 0),
+  );
+
+  return {
+    totalEarnings: round2(firstCutoff.totalEarnings + secondCutoff.totalEarnings),
+  };
+}
+
+function buildDemoPayslips(count: number): DemoPayslip[] {
   const periods: { start: Date; end: Date; payday: Date }[] = [];
   for (const year of [todayStart.getFullYear() - 1, todayStart.getFullYear()]) {
     for (let month = 0; month < 12; month += 1) {
@@ -924,54 +1031,61 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
     .map((period): DemoPayslip => {
       const year = period.start.getFullYear();
       const cutoff: 1 | 2 = period.start.getDate() === 1 ? 1 : 2;
+      const actualPayroll = actualPayrollOverrides[dateKey(period.start)];
+      const payroll = getDemoPayrollTotals(period.start, period.end);
+      const {
+        silDays,
+        lwopDays,
+        basicDays,
+        regularHours,
+        basicPay,
+        silPay,
+        lwopPay,
+        paidDays,
+        tardiness,
+        tardinessHours,
+        totalEarnings,
+      } = payroll;
 
-      let daysWorked = 0;
-      let silDays = 0;
-      let lwopDays = 0;
-      let lateMinutes = 0;
-      for (
-        const day = new Date(period.start);
-        day <= period.end;
-        day.setDate(day.getDate() + 1)
-      ) {
-        const record = getDemoAttendanceForPayroll(new Date(day));
-        if (!record) continue;
-        if (record.status === "LWOP") {
-          lwopDays += 1;
-          continue;
-        }
-        if (record.status === "SIL") {
-          silDays += 1;
-          continue;
-        }
-        daysWorked += 1;
-        lateMinutes += record.totalLateMinutes;
-      }
-
-      const basicDays = daysWorked + lwopDays;
-      const regularHours = basicDays * HOURS_PER_DAY;
-      const basicPay = round2(regularHours * (DAILY_RATE / HOURS_PER_DAY));
-      const silPay = round2(silDays * DAILY_RATE);
-      const lwopPay = -round2(lwopDays * DAILY_RATE);
-      const paidDays = daysWorked + silDays;
-      const tardiness = -tardinessDeduction(lateMinutes);
-      const tardinessHours = lateMinutes / 60;
-      const totalEarnings = round2(basicPay + silPay + lwopPay + tardiness);
-
-      const deductionItems = [
-        {
-          description: "SSS Payable",
-          amount: amountForCutoff(monthly.sss, cutoff),
-        },
-        {
-          description: "PhilHealth Payable",
-          amount: amountForCutoff(monthly.philHealth, cutoff),
-        },
-        {
-          description: "HDMF Payable",
-          amount: amountForCutoff(monthly.pagIbig, cutoff),
-        },
-      ];
+      const deductionItems = actualPayroll
+        ? [
+            { description: "SSS Payable", amount: actualPayroll.sssDeduction },
+            ...(actualPayroll.philHealthDeduction !== undefined
+              ? [{
+                  description: "PhilHealth Payable",
+                  amount: actualPayroll.philHealthDeduction,
+                }]
+              : []),
+            ...(actualPayroll.pagIbigDeduction !== undefined
+              ? [{
+                  description: "HDMF Payable",
+                  amount: actualPayroll.pagIbigDeduction,
+                }]
+              : []),
+          ]
+        : [
+            {
+              description: "SSS Payable",
+              amount: sssEmployeeShare(totalEarnings),
+            },
+            ...(cutoff === 1
+              ? [
+                  {
+                    description: "PhilHealth Payable",
+                    amount: philHealthEmployeeShare(
+                      getDemoMonthlyPayrollTotals(
+                        year,
+                        period.start.getMonth(),
+                      ).totalEarnings,
+                    ),
+                  },
+                  {
+                    description: "HDMF Payable",
+                    amount: PAGIBIG_EMPLOYEE_CONTRIBUTION,
+                  },
+                ]
+              : []),
+          ];
       const totalDeductions = round2(
         deductionItems.reduce((sum, item) => sum + item.amount, 0),
       );
@@ -996,7 +1110,7 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
         ytdTaxable: formatMoney(running.net),
         ytdTaxWithheld: "",
         taxStatus: "",
-        position: demoEmployee.designation,
+        position: actualPayroll?.position ?? demoEmployee.designation,
         department: demoEmployee.department,
         company: demoEmployee.company.toUpperCase(),
         headOffice: "000 DEMO HEAD OFFICE",
@@ -1037,7 +1151,7 @@ function buildDemoPayslips(count: number): DemoPayslip[] {
                 },
               ]
             : []),
-          ...(lateMinutes > 0
+          ...(tardiness < 0
             ? [
                 {
                   description: "UT/Tardiness",

@@ -869,7 +869,7 @@ function createStyles(RcsColors: Record<keyof RcsPalette, string>) {
   adjacentChoice: { opacity: 0.45 },
   adjacentChoiceText: { color: RcsColors.grayMuted },
   selectedDay: { backgroundColor: RcsColors.brownSurface },
-  todayHighlightDay: { backgroundColor: '#FFF0CA' },
+  todayHighlightDay: { backgroundColor: RcsColors.yellowLight },
   todayHighlightDayText: { color: RcsColors.todayHighlightText, fontWeight: '800' },
   dayText: { color: RcsColors.grayDark, fontSize: 13 },
   markedDayDot: { width: 4, height: 4, marginTop: 2, borderRadius: 2, backgroundColor: RcsColors.brownLight },

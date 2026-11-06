@@ -1,6 +1,6 @@
 export const DAILY_RATE = 750;
 export const HOURS_PER_DAY = 8;
-export const WORK_DAYS_PER_MONTH = 26;
+export const PAGIBIG_EMPLOYEE_CONTRIBUTION = 200;
 
 export type ContributionSchedule = "split" | "first" | "second";
 export const CONTRIBUTION_SCHEDULE: ContributionSchedule = "split";
@@ -15,12 +15,11 @@ export function sssMonthlySalaryCredit(monthlyCompensation: number) {
 }
 
 export function sssEmployeeShare(monthlyCompensation: number) {
-  return round2(sssMonthlySalaryCredit(monthlyCompensation) * 0.05);
+  return round2(monthlyCompensation * 0.05);
 }
 
 export function philHealthEmployeeShare(monthlyBasicSalary: number) {
-  const base = Math.min(100000, Math.max(10000, monthlyBasicSalary));
-  return round2((base * 0.05) / 2);
+  return round2(monthlyBasicSalary * 0.025);
 }
 
 export function pagIbigEmployeeShare(monthlyCompensation: number) {
